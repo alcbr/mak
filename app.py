@@ -1,6 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
-import feedparser
+import feedparser  # <-- Garante que a busca de notícias funcione
 
 # Configuração da página
 st.set_page_config(page_title="TechPulse Radar Pro", page_icon="📡", layout="wide")
@@ -18,7 +18,7 @@ with st.sidebar:
         ("Data Center Dynamics", "CISO Advisor", "Convergência Digital")
     )
 
-# Dicionário com os links de RSS dos sites que você mandou
+# Dicionário com os links reais de RSS
 fontes_rss = {
     "Data Center Dynamics": "https://www.datacenterdynamics.com/br/feed/",
     "CISO Advisor": "https://www.cisoadvisor.com.br/feed/",
@@ -31,25 +31,27 @@ st.subheader(f"🔍 Últimas de: {fonte_escolhida}")
 if st.button("🔄 Sincronizar Notícias"):
     try:
         url_feed = fontes_rss[fonte_escolhida]
+        # Aqui o app busca as notícias no site
         feed = feedparser.parse(url_feed)
         
         if not feed.entries:
-            st.error("Não consegui ler o feed desse site no momento. Tente outro.")
+            st.error("Não consegui ler as notícias desse site agora. Tente outra fonte.")
         else:
-            st.session_state['lista_noticias'] = feed.entries[:8] # Pega as 8 últimas
-            st.success(f"Radar atualizado com sucesso!")
+            # Salva as 8 notícias na 'memória' do app
+            st.session_state['lista_noticias'] = feed.entries[:8]
+            st.success(f"Radar atualizado!")
     except Exception as e:
         st.error(f"Erro ao acessar o site: {e}")
 
-# Seleção da Notícia
+# Seleção da Notícia encontrada
 texto_para_ia = ""
 if 'lista_noticias' in st.session_state:
     titulos = [n.title for n in st.session_state['lista_noticias']]
     escolha_titulo = st.selectbox("Selecione a notícia para gerar o Insight:", titulos)
     
-    # Encontra o resumo da notícia escolhida
     for n in st.session_state['lista_noticias']:
         if n.title == escolha_titulo:
+            # Pega o resumo ou descrição da notícia
             texto_para_ia = n.get('summary', n.get('description', 'Sem resumo disponível.'))
             st.info(f"**Prévia da Notícia:** {texto_para_ia[:300]}...")
             break
@@ -61,7 +63,7 @@ st.subheader("💡 Gerar Estratégia de Marketing")
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    final_input = st.text_area("Contexto para a IA (pode editar o texto se quiser):", 
+    final_input = st.text_area("Contexto para a IA (você pode editar este texto):", 
                               value=texto_para_ia, height=150)
 
 with col2:
@@ -69,12 +71,29 @@ with col2:
 
 if st.button("🚀 Criar Insight Estratégico"):
     if not chave or not final_input:
-        st.error("Preencha a chave API e selecione uma notícia!")
+        st.error("Preencha a chave API e selecione uma notícia acima!")
     else:
         try:
             genai.configure(api_key=chave)
-            # Busca modelo automático
-            models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            model = genai.GenerativeModel(models[0])
+            # Busca automática do modelo disponível na sua conta
+            modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            model = genai.GenerativeModel(modelos[0])
             
-            with st.spinner('
+            with st.spinner('O agente está analisando o mercado...'):
+                prompt = f"""
+                Aja como um Diretor de Marketing de Tecnologia. 
+                Analise a notícia abaixo para o público: {perfil}.
+                
+                Forneça em Português:
+                1. 🌡️ Análise de Sentimento (Impacto no setor).
+                2. 💎 Oportunidade de Ouro (Como nossa empresa pode se posicionar?).
+                3. ✍️ Sugestão de Post para LinkedIn.
+                4. 🎯 Título para E-mail Marketing.
+                
+                Notícia: {final_input}
+                """
+                response = model.generate_content(prompt)
+                st.success("✅ Insight Gerado!")
+                st.markdown(response.text)
+        except Exception as e:
+            st.error(f"Erro na IA: {e}")
