@@ -6,54 +6,51 @@ import re
 # --- 1. CONFIGURAÇÃO ---
 st.set_page_config(page_title="Tech Intelligence Hub", page_icon="🛡️", layout="wide")
 
-# --- 2. CSS ULTRA BLACK & NEON GLOW ---
+# --- 2. CSS ULTRA BLACK (FORÇADO) ---
 st.markdown("""
     <style>
-    /* Fundo Preto Absoluto */
-    .main { background-color: #000000; color: #ffffff; font-family: 'Inter', sans-serif; }
-    
-    /* Cards com Efeito de Vidro e Bordas Neon */
-    .st-emotion-cache-12w0qpk { 
-        background: rgba(18, 18, 24, 0.8) !important; 
-        border: 1px solid rgba(0, 229, 255, 0.3) !important; 
+    /* Força o fundo preto em absolutamente tudo */
+    [data-testid="stAppViewContainer"], 
+    [data-testid="stHeader"], 
+    [data-testid="stSidebar"], 
+    .main {
+        background-color: #000000 !important;
+        color: #ffffff !important;
+    }
+
+    /* Estilo dos Cards com Vidro e Neon */
+    .st-emotion-cache-12w0qpk, .st-emotion-cache-6qob1r { 
+        background: rgba(20, 20, 25, 0.9) !important; 
+        border: 1px solid rgba(0, 229, 255, 0.4) !important; 
         border-radius: 20px !important; 
         padding: 25px !important; 
-        box-shadow: 0 0 15px rgba(0, 229, 255, 0.1);
-        backdrop-filter: blur(10px);
+        box-shadow: 0 0 20px rgba(0, 229, 255, 0.1) !important;
     }
     
-    /* Títulos e Textos */
-    h1, h2, h3 { font-family: 'Inter', sans-serif; font-weight: 800; color: #ffffff !important; }
-    .neon-green { color: #00ffa3; text-shadow: 0 0 10px rgba(0, 255, 163, 0.4); }
-    .neon-purple { color: #bc13fe; text-shadow: 0 0 10px rgba(188, 19, 254, 0.4); }
-    .step-label { color: #00e5ff; font-weight: bold; font-size: 0.8em; text-transform: uppercase; letter-spacing: 2px; }
+    /* Títulos e Textos Neon */
+    h1, h2, h3, p, span, label { color: #ffffff !important; font-family: 'Inter', sans-serif; }
+    .neon-green { color: #00ffa3 !important; text-shadow: 0 0 10px rgba(0, 255, 163, 0.5); }
+    .neon-purple { color: #bc13fe !important; text-shadow: 0 0 10px rgba(188, 19, 254, 0.5); }
+    .step-label { color: #00e5ff !important; font-weight: bold; font-size: 0.8em; text-transform: uppercase; letter-spacing: 2px; }
     
-    /* Botões Ultra Modernos */
+    /* Botões com Gradiente */
     .stButton>button {
         width: 100%;
-        border-radius: 15px;
-        height: 4em;
+        border-radius: 15px !important;
+        height: 4em !important;
         background: linear-gradient(90deg, #bc13fe, #00e5ff) !important;
         color: white !important;
         font-weight: bold !important;
         border: none !important;
-        box-shadow: 0 0 20px rgba(188, 19, 254, 0.3);
-        transition: all 0.5s ease;
+        box-shadow: 0 0 20px rgba(188, 19, 254, 0.4) !important;
     }
     .stButton>button:hover { 
-        transform: scale(1.02); 
-        box-shadow: 0 0 35px rgba(0, 229, 255, 0.5); 
+        transform: scale(1.02) !important; 
+        box-shadow: 0 0 40px rgba(0, 229, 255, 0.6) !important; 
     }
-    
-    /* Conteúdo dos Cards */
-    .content-card {
-        background-color: rgba(0, 0, 0, 0.5);
-        padding: 20px;
-        border-radius: 15px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        color: #f1f5f9;
-        line-height: 1.8;
-    }
+
+    /* Remove linhas brancas de divisores */
+    hr { border-color: rgba(255, 255, 255, 0.1) !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -70,7 +67,7 @@ def get_model(key):
 
 # --- 4. BARRA LATERAL ---
 with st.sidebar:
-    st.title("🛡️ Central de Comando")
+    st.markdown("### 🛡️ Central de Comando")
     chave = st.text_input("Gemini API Key:", type="password")
     st.divider()
     fontes = {
@@ -85,22 +82,19 @@ with st.sidebar:
         f = feedparser.parse(fontes[canal])
         if f.entries:
             st.session_state['news'] = f.entries[:10]
-            # Limpa estados anteriores para evitar confusão entre notícias
             st.session_state.pop('report', None)
             st.session_state.pop('final', None)
             st.toast("📡 Conexão Estabelecida!")
 
 # --- 5. INTERFACE PRINCIPAL ---
 st.markdown("# 🛡️ Intelligence <span class='neon-green'>Hub</span>", unsafe_allow_html=True)
-st.markdown("---")
+st.divider()
 
 if 'news' in st.session_state:
-    # Seletor de Pauta Centralizado (Corrigido para não dar erro)
     _, col_mid, _ = st.columns([0.5, 2, 0.5])
     with col_mid:
         titulos = [n.title for n in st.session_state['news']]
         escolha = st.selectbox("🎯 Selecione a notícia alvo:", titulos)
-        # CORREÇÃO AQUI: Usando st.session_state['news']
         noticia = next(n for n in st.session_state['news'] if n.title == escolha)
     
     st.markdown("<br>", unsafe_allow_html=True)
@@ -119,7 +113,7 @@ if 'news' in st.session_state:
                     st.session_state['report'] = res.text
         
         relatorio = st.session_state.get('report', 'Aguardando pauta...')
-        st.markdown(f"<div class='content-card'>{relatorio}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);'>{relatorio}</div>", unsafe_allow_html=True)
 
     with c2:
         st.markdown("<p class='step-label'>Step 02</p> ### <span class='neon-purple'>🎨</span> Produção", unsafe_allow_html=True)
@@ -137,14 +131,14 @@ if 'news' in st.session_state:
                 with st.spinner("Orquestrando campanha..."):
                     res = m.generate_content(prompt_f)
                     st.session_state['final'] = res.text
-            else: st.warning("Faça o Passo 01 primeiro!")
+            else: st.warning("Faça o Passo 01!")
 
     with c3:
         st.markdown("<p class='step-label'>Step 03</p> ### <span class='neon-purple'>✨</span> Resultados", unsafe_allow_html=True)
         if 'final' in st.session_state:
             tab1, tab2 = st.tabs(["📄 Roteiros", "🎨 Visual"])
             with tab1:
-                st.markdown(f"<div class='content-card'>{st.session_state['final']}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);'>{st.session_state['final']}</div>", unsafe_allow_html=True)
             with tab2:
                 st.subheader("Prompt Visual (MJ)")
                 try:
@@ -152,9 +146,9 @@ if 'news' in st.session_state:
                     st.code(p_vis, language="text")
                     st.link_button("🚀 Abrir Midjourney", "https://www.midjourney.com/imagine", use_container_width=True)
                 except:
-                    st.write("Prompt não encontrado no texto gerado.")
+                    st.write("Prompt não encontrado.")
         else:
             st.info("Aguardando geração do Passo 02.")
 
 else:
-    st.info("👈 Sincronize o radar para iniciar a central.")
+    st.info("👈 Sincronize o radar na barra lateral para iniciar.")
