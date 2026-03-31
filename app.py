@@ -6,14 +6,15 @@ import re
 # --- CONFIGURAÇÕES DE PÁGINA ---
 st.set_page_config(page_title="TechPulse Agency Pro", page_icon="⚡", layout="wide")
 
-# --- CSS PARA CORRIGIR OS BUGS DE INTERFACE ---
+# --- CSS PARA DESIGN CENTRALIZADO E BOTÃO DESABILITADO ---
 st.markdown("""
     <style>
-    /* Trava o container para não sumir no hover */
-    .stSelectbox, .stButton, .stTextArea { margin-bottom: 10px; }
-    
-    /* Ajusta a largura dos seletores para a seta não ficar longe */
-    [data-testid="stSelectbox"] { max-width: 100%; }
+    /* Centraliza e limita a largura da pauta para a seta não fugir */
+    .pauta-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding-bottom: 20px;
+    }
     
     /* Estilo dos Cards */
     .content-card {
@@ -25,12 +26,19 @@ st.markdown("""
         min-height: 100px;
     }
     
-    /* Botões Verdes */
+    /* Botão Verde Padrão */
     .stButton>button {
         background-color: #00c853 !important;
         color: white !important;
         font-weight: bold !important;
         border: none !important;
+    }
+
+    /* Botão Desabilitado (Cinza) */
+    .stButton>button:disabled {
+        background-color: #333 !important;
+        color: #777 !important;
+        cursor: not-allowed;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -39,6 +47,11 @@ st.markdown("""
 def limpar_html(texto):
     clean = re.compile('<.*?>')
     return re.sub(clean, '', texto)
+
+def noticia_e_estrangeira(url):
+    # Se não tiver .br no link ou for securityweek/hackernews, consideramos estrangeira
+    paises_pt = ['.br', 'convergenciadigital', 'cisoadvisor']
+    return not any(p in url.lower() for p in paises_pt)
 
 def get_model(api_key):
     try:
@@ -64,33 +77,45 @@ with st.sidebar:
         feed = feedparser.parse(fontes_rss[fonte_focada])
         if feed.entries:
             st.session_state['noticias_focadas'] = feed.entries[:10]
-            st.session_state.pop('base_traduzida', None) # Limpa tradução anterior
+            st.session_state.pop('base_traduzida', None)
             st.success("Radar Atualizado!")
 
-# --- CONTEÚDO PRINCIPAL ---
+# --- DASHBOARD PRINCIPAL ---
 st.title("⚡ TechPulse Agency Pro")
 
 if 'noticias_focadas' in st.session_state:
-    # Seleção de pauta mais compacta
-    escolha = st.selectbox("🎯 Selecione a Pauta:", [n.title for n in st.session_state['noticias_focadas']])
+    # Container centralizado para a pauta (Seta próxima do texto)
+    st.markdown('<div class="pauta-container">', unsafe_allow_html=True)
+    escolha = st.selectbox("🎯 Selecione a Pauta do Dia:", [n.title for n in st.session_state['noticias_focadas']])
+    st.markdown('</div>', unsafe_allow_html=True)
+    
     noticia_alvo = next(n for n in st.session_state['noticias_focadas'] if n.title == escolha)
+    link_noticia = noticia_alvo.get('link', '')
+    precisa_traduzir = noticia_e_estrangeira(link_noticia)
 
     col_a, col_b = st.columns([1, 1])
     
     with col_a:
         st.subheader("📰 Conteúdo Base")
-        if st.button("🌍 Traduzir Agora"):
-            if not chave: st.error("Insira a chave na barra lateral.")
-            else:
-                model = get_model(chave)
-                if model:
-                    txt = limpar_html(noticia_alvo.get('summary', noticia_alvo.get('description', '')))
-                    with st.spinner("Traduzindo..."):
-                        res = model.generate_content(f"Traduza para Marketing Tech BR: {noticia_alvo.title}. Resumo: {txt}")
-                        st.session_state['base_traduzida'] = res.text
+        
+        # Lógica do Botão de Tradução
+        if precisa_traduzir:
+            label_btn = "🌍 Traduzir Conteúdo (EN -> PT)"
+            bloqueado = False
+        else:
+            label_btn = "✅ Notícia já em Português"
+            bloqueado = True
 
-        # Exibe o texto (estável na tela)
-        base_texto = st.session_state.get('base_traduzida', f"Título: {noticia_alvo.title}")
+        if st.button(label_btn, disabled=bloqueado):
+            model = get_model(chave)
+            if model:
+                txt = limpar_html(noticia_alvo.get('summary', noticia_alvo.get('description', '')))
+                with st.spinner("Traduzindo..."):
+                    res = model.generate_content(f"Traduza para Marketing Tech BR: {noticia_alvo.title}. Resumo: {txt}")
+                    st.session_state['base_traduzida'] = res.text
+
+        # Exibição do Texto
+        base_texto = st.session_state.get('base_traduzida', f"**{noticia_alvo.title}**\n\n{limpar_html(noticia_alvo.get('summary', noticia_alvo.get('description', '')))}")
         st.markdown(f"<div class='content-card'>{base_texto}</div>", unsafe_allow_html=True)
 
     with col_b:
@@ -105,15 +130,13 @@ if 'noticias_focadas' in st.session_state:
         q_li = c3.checkbox("LinkedIn")
         
         if st.button("🚀 GERAR CAMPANHA 360º"):
-            if not chave: st.error("Chave API faltando!")
+            if not chave: st.error("Falta Chave API!")
             else:
                 model = get_model(chave)
                 if model:
-                    prompt = f"""
-                    Aja como Diretor de Criação Tech. Base: {base_texto}. Público: {perfil}.
+                    prompt = f"""Aja como Diretor de Criação Tech. Base: {base_texto}. Público: {perfil}.
                     Gere conteúdo para: {'Stories,' if q_st else ''} {'Feed,' if q_fd else ''} {'LinkedIn ('+str(slides)+' slides).' if q_li else ''}
-                    Crie também 3 Hooks (Ganhos), um Prompt Visual em inglês e sugestão de agendamento.
-                    """
+                    Crie também 3 Hooks, Prompt Visual e Agendamento."""
                     with st.spinner("Orquestrando campanha..."):
                         response = model.generate_content(prompt)
                         st.session_state['full_campaign'] = response.text
