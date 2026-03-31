@@ -3,7 +3,7 @@ import google.generativeai as genai
 import feedparser
 import re
 
-# Função para limpar sujeira de HTML (tags <p>, <a>, etc)
+# Função para limpar sujeira de HTML
 def limpar_html(texto):
     clean = re.compile('<.*?>')
     return re.sub(clean, '', texto)
@@ -47,41 +47,52 @@ if st.button("🔄 Sincronizar Notícias"):
             st.session_state['noticias_focadas'] = feed.entries[:10]
             st.success(f"Radar {fonte_focada} atualizado!")
         else:
-            st.error("Erro ao ler o feed. Tente novamente.")
+            st.error("Erro ao ler o feed.")
     except Exception as e:
-        st.error(f"Erro de conexão: {e}")
+        st.error(f"Erro: {e}")
 
-texto_noticia = ""
+noticia_selecionada = None
 if 'noticias_focadas' in st.session_state:
     titulos = [n.title for n in st.session_state['noticias_focadas']]
     escolha = st.selectbox("Selecione a notícia alvo:", titulos)
     
     for n in st.session_state['noticias_focadas']:
         if n.title == escolha:
-            # Limpa o HTML da notícia
-            texto_sujo = n.get('summary', n.get('description', ''))
-            texto_limpo = limpar_html(texto_sujo)
-            
-            # Tradução Automática da Prévia para o Usuário
-            if chave:
-                try:
-                    genai.configure(api_key=chave)
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    traducao = model.generate_content(f"Traduza para português de forma clara: {texto_limpo}")
-                    texto_noticia = traducao.text
-                except:
-                    texto_noticia = texto_limpo # Fallback se a tradução falhar
-            else:
-                texto_noticia = texto_limpo
-
-            # Exibição Bonita
-            st.markdown(f"""
-                <div class="noticia-box">
-                    <h4 style='margin-top:0;'>📰 Notícia Selecionada (Traduzida):</h4>
-                    <p>{texto_noticia}</p>
-                </div>
-                """, unsafe_allow_html=True)
+            noticia_selecionada = n
             break
+
+# --- TRADUÇÃO DA BASE ---
+texto_base_final = ""
+if noticia_selecionada:
+    texto_original = limpar_html(noticia_selecionada.get('summary', noticia_selecionada.get('description', '')))
+    titulo_original = noticia_selecionada.title
+
+    if st.button("🌍 Traduzir Notícia Selecionada"):
+        if not chave:
+            st.error("Insira a chave API para traduzir.")
+        else:
+            try:
+                genai.configure(api_key=chave)
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                prompt_traducao = f"Traduza o título e o resumo abaixo para Português do Brasil de forma profissional:\nTítulo: {titulo_original}\nResumo: {texto_original}"
+                
+                with st.spinner('Traduzindo...'):
+                    resultado = model.generate_content(prompt_traducao)
+                    st.session_state['texto_traduzido'] = resultado.text
+                    st.success("Tradução concluída!")
+            except Exception as e:
+                st.error(f"Erro na tradução: {e}")
+
+    # Exibe a tradução se ela existir, senão exibe o original limpo
+    texto_para_exibir = st.session_state.get('texto_traduzido', f"Título: {titulo_original}\n\nResumo: {texto_original}")
+    texto_base_final = texto_para_exibir # Esta será a base para os posts
+
+    st.markdown(f"""
+        <div class="noticia-box">
+            <h4 style='margin-top:0;'>📝 Conteúdo Base (Pronto para Post):</h4>
+            <p style='white-space: pre-wrap;'>{texto_para_exibir}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -103,8 +114,8 @@ with col_num:
     perfil = st.selectbox("Público-alvo:", ["Diretores/C-Level", "Gerentes de TI", "Especialistas"])
 
 if st.button("🚀 Gerar Campanha Completa"):
-    if not chave or not texto_noticia:
-        st.error("Verifique a chave API e a notícia.")
+    if not chave or not texto_base_final:
+        st.error("Verifique a chave API e se a notícia foi selecionada/traduzida.")
     elif not (quer_stories or quer_feed or quer_linkedin):
         st.warning("Selecione um formato.")
     else:
@@ -113,21 +124,19 @@ if st.button("🚀 Gerar Campanha Completa"):
             modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
             model = genai.GenerativeModel(modelos[0])
             
-            prompt = f"""
+            prompt_final = f"""
             Aja como um Estrategista de Marketing Tech.
-            Notícia: {texto_noticia}
+            Base: {texto_base_final}
             Público: {perfil}
             
-            Gere os seguintes formatos em PORTUGUÊS:
-            {"- STORIES: Texto minimalista (máx 15 palavras por tela), frases rápidas." if quer_stories else ""}
-            {"- FEED META: Texto engajador, com legenda e foco em benefícios." if quer_feed else ""}
-            {"- LINKEDIN: Post técnico e com autoridade, estruturado em "+str(slides_qtd)+" slides." if quer_linkedin else ""}
-            
-            Respeite rigorosamente o tom de voz de cada rede.
+            Gere em PORTUGUÊS:
+            {"- STORIES: Texto minimalista (máx 15 palavras por tela)." if quer_stories else ""}
+            {"- FEED META: Texto engajador com legenda estratégica." if quer_feed else ""}
+            {"- LINKEDIN: Post técnico estruturado em "+str(slides_qtd)+" slides." if quer_linkedin else ""}
             """
             
-            with st.spinner('Criando sua campanha...'):
-                response = model.generate_content(prompt)
+            with st.spinner('Criando posts...'):
+                response = model.generate_content(prompt_final)
                 st.success("✅ Conteúdos Gerados!")
                 st.markdown(response.text)
         except Exception as e:
