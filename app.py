@@ -13,9 +13,9 @@ with st.sidebar:
     st.header("⚙️ Configurações")
     chave = st.text_input("Sua Chave API Gemini:", type="password")
     st.markdown("---")
-    st.info("O sistema agora traduz notícias globais automaticamente para carrosséis em Português.")
+    st.info("Sistema de tradução e criação automática de carrosséis.")
 
-# Dicionário atualizado com as 5 fontes (BR + EN)
+# Fontes (BR + EN)
 fontes_rss = {
     "CISO Advisor (BR)": "https://www.cisoadvisor.com.br/feed/",
     "Data Center Dynamics (BR)": "https://www.datacenterdynamics.com/br/feed/",
@@ -35,10 +35,10 @@ with col_fontes:
         try:
             feed = feedparser.parse(fontes_rss[fonte_focada])
             if not feed.entries:
-                st.error("Não consegui carregar este feed. Tente outra fonte.")
+                st.error("Não consegui carregar este feed.")
             else:
                 st.session_state['noticias_focadas'] = feed.entries[:8]
-                st.success(f"Radar {fonte_focada} Atualizado!")
+                st.success("Radar Atualizado!")
         except Exception as e:
             st.error(f"Erro ao buscar: {e}")
 
@@ -46,65 +46,57 @@ with col_lista:
     texto_noticia = ""
     if 'noticias_focadas' in st.session_state:
         titulos = [n.title for n in st.session_state['noticias_focadas']]
-        escolha = st.selectbox("Escolha a notícia (mesmo em inglês):", titulos)
-        
+        escolha = st.selectbox("Escolha a notícia:", titulos)
         for n in st.session_state['noticias_focadas']:
             if n.title == escolha:
-                texto_noticia = n.get('summary', n.get('description', 'Sem resumo disponível.'))
-                st.info(f"**Conteúdo Original:** {texto_noticia[:300]}...")
+                texto_noticia = n.get('summary', n.get('description', ''))
+                st.info(f"**Prévia:** {texto_noticia[:200]}...")
                 break
 
-# --- PARTE 2: GERAÇÃO DE CARROSSEL COM TRADUÇÃO ---
+# --- PARTE 2: GERAÇÃO DE CARROSSEL ---
 st.markdown("---")
 st.subheader("🎨 2. Tradutor & Criador de Carrossel")
 
 if texto_noticia:
     col_input, col_config = st.columns([2, 1])
-    
     with col_input:
-        input_ia = st.text_area("Texto base (pode estar em inglês):", value=texto_noticia, height=150)
-    
+        input_ia = st.text_area("Texto base:", value=texto_noticia, height=150)
     with col_config:
-        perfil = st.selectbox("Público-alvo no Brasil:", ["Diretores (C-Level)", "Gerentes de TI", "Analistas Técnicos"])
+        perfil = st.selectbox("Público-alvo:", ["Diretores", "Gerentes de TI", "Analistas"])
         slides = st.slider("Slides de conteúdo:", 3, 7, 5)
 
     if st.button("🚀 Traduzir e Gerar Carrossel"):
         if not chave:
-            st.error("Insira a chave API na barra lateral!")
+            st.error("Insira a chave API!")
         else:
             try:
                 genai.configure(api_key=chave)
-                # Tenta o modelo mais atualizado
-                model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                prompt = f"""
-                Você é um Estrategista de Marketing Tech B2B Bilíngue.
-                Sua tarefa é ler a notícia abaixo (que pode estar em inglês ou português) e criar um roteiro de carrossel para LinkedIn TOTALMENTE EM PORTUGUÊS.
+                # --- SOLUÇÃO PARA O ERRO 404: AUTO-DETECÇÃO ---
+                # Listamos os modelos que permitem geração de conteúdo
+                modelos_disponiveis = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 
-                O público-alvo são {perfil} brasileiros.
-                
-                Instruções de Saída (EM PORTUGUÊS):
-                - Slide 1: Capa (Título Magnético traduzido para o contexto BR)
-                - Slides 2 a {slides + 1}: Conteúdo técnico simplificado e estratégico (Título, texto em tópicos e sugestão visual)
-                - Slide Final: CTA (Chamada para ação para marketing tech)
-                
-                Notícia Base: 
-                {input_ia}
-                """
-                
-                with st.spinner('Lendo notícia global e criando roteiro em Português...'):
-                    response = model.generate_content(prompt)
-                    st.success("✅ Roteiro Traduzido e Gerado!")
-                    st.divider()
-                    st.markdown(response.text)
+                if not modelos_disponiveis:
+                    st.error("Sua chave não tem permissão para nenhum modelo de IA. Verifique no AI Studio.")
+                else:
+                    # Escolhemos o primeiro da lista (geralmente é o 1.5 flash ou pro)
+                    nome_modelo = modelos_disponiveis[0]
+                    model = genai.GenerativeModel(nome_modelo)
+                    
+                    prompt = f"""
+                    Aja como um Estrategista de Marketing Tech.
+                    Crie um roteiro de carrossel para LinkedIn TOTALMENTE EM PORTUGUÊS.
+                    Público: {perfil}.
+                    Notícia: {input_ia}
+                    Slides solicitados: {slides + 2} (Capa, Conteúdo, CTA).
+                    Retorne Título do Slide, Conteúdo e Sugestão Visual para cada um.
+                    """
+                    
+                    with st.spinner(f'Conectando ao modelo: {nome_modelo}...'):
+                        response = model.generate_content(prompt)
+                        st.success(f"✅ Roteiro gerado usando {nome_modelo}!")
+                        st.markdown(response.text)
             except Exception as e:
-                # Fallback para o modelo Pro se o Flash falhar
-                try:
-                    model = genai.GenerativeModel('gemini-pro')
-                    response = model.generate_content(prompt)
-                    st.success("✅ Gerado com sucesso (Modelo Pro)!")
-                    st.markdown(response.text)
-                except:
-                    st.error(f"Erro na conexão com a IA: {e}")
+                st.error(f"Erro Crítico: {e}")
 else:
-    st.warning("Sincronize e selecione uma notícia acima para começar.")
+    st.warning("Sincronize as notícias acima.")
