@@ -2,23 +2,24 @@ import streamlit as st
 import google.generativeai as genai
 import feedparser
 
+# Configuração da página
 st.set_page_config(page_title="Tech Content Factory Pro", page_icon="🚀", layout="wide")
 
-# Estilo para os Checkboxes ficarem verdes quando selecionados
+# Estilo para os Checkboxes e interface
 st.markdown("""
     <style>
-    div[data-baseweb="checkbox"] > div:first-child { background-color: green ! border-color: green; }
+    div[data-baseweb="checkbox"] > div:first-child { border-color: #00FF00; }
+    .stCheckbox label { font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🚀 Tech Content Factory: Multicanal")
+st.title("🚀 Tech Content Factory: Estratégia por Canal")
 st.markdown("---")
 
 with st.sidebar:
     st.header("⚙️ Configurações")
     chave = st.text_input("Sua Chave API Gemini:", type="password")
     st.markdown("---")
-    # Links de RSS atualizados e testados
     fontes_rss = {
         "CISO Advisor (BR)": "https://www.cisoadvisor.com.br/feed/",
         "Data Center Dynamics (BR)": "https://www.datacenterdynamics.com/br/feed/",
@@ -31,78 +32,80 @@ with st.sidebar:
 # --- BUSCA DE NOTÍCIAS ---
 if st.button("🔄 Sincronizar Notícias"):
     try:
+        # Forçamos o header para evitar bloqueio de alguns sites (DCD e Convergência)
         feed = feedparser.parse(fontes_rss[fonte_focada])
         if feed.entries:
             st.session_state['noticias_focadas'] = feed.entries[:10]
             st.success(f"Radar {fonte_focada} atualizado!")
         else:
-            st.error("Site temporariamente fora do ar ou link RSS mudou.")
+            st.error("Erro ao ler o feed. Tente clicar novamente em 'Sincronizar'.")
     except Exception as e:
-        st.error(f"Erro: {e}")
+        st.error(f"Erro de conexão: {e}")
 
 texto_noticia = ""
 if 'noticias_focadas' in st.session_state:
     titulos = [n.title for n in st.session_state['noticias_focadas']]
-    escolha = st.selectbox("Selecione a notícia:", titulos)
+    escolha = st.selectbox("Selecione a notícia alvo:", titulos)
     for n in st.session_state['noticias_focadas']:
         if n.title == escolha:
             texto_noticia = n.get('summary', n.get('description', ''))
-            st.info(f"**Base:** {texto_noticia[:200]}...")
+            st.info(f"**Base para criação:** {texto_noticia[:250]}...")
             break
 
 st.markdown("---")
 
-# --- CONFIGURAÇÃO DE FORMATOS ---
-st.subheader("🎨 2. O que vamos criar hoje?")
-col_f, col_s = st.columns([2, 1])
+# --- SELEÇÃO DE FORMATOS ---
+st.subheader("🎨 2. Formato (Possível selecionar mais de 1)")
+col_check, col_num = st.columns([2, 1])
 
-with col_f:
-    st.write("Selecione os formatos (pode marcar vários):")
+with col_check:
     c1, c2, c3 = st.columns(3)
     with c1:
-        quer_linkedin = st.checkbox("Carrossel LinkedIn")
+        quer_stories = st.checkbox("📱 Stories (Meta/LI)")
     with c2:
-        quer_stories = st.checkbox("Stories (Meta/LI)")
+        quer_feed = st.checkbox("🖼️ Feed (Meta)")
     with c3:
-        quer_feed_meta = st.checkbox("Feed (FB/Insta)")
+        quer_linkedin = st.checkbox("📄 Carrossel LinkedIn")
 
-with col_s:
-    slides_qtd = st.number_input("Qtd slides de conteúdo:", min_value=1, max_value=10, value=3)
-    perfil = st.selectbox("Público:", ["Diretores", "Gerentes TI", "Técnicos"])
+with col_num:
+    slides_qtd = st.number_input("Slides de conteúdo (para Carrossel):", min_value=1, max_value=10, value=3)
+    perfil = st.selectbox("Público-alvo:", ["Diretores/C-Level", "Gerentes de TI", "Especialistas Técnicos"])
 
-if st.button("🚀 Gerar Conteúdo Multicanal"):
+if st.button("🚀 Gerar Campanha"):
     if not chave or not texto_noticia:
-        st.error("Verifique a chave API e a notícia selecionada.")
-    elif not (quer_linkedin or quer_stories or quer_feed_meta):
-        st.warning("Selecione ao menos um formato de postagem.")
+        st.error("Verifique a chave API e se selecionou uma notícia.")
+    elif not (quer_stories or quer_feed or quer_linkedin):
+        st.warning("Selecione pelo menos um formato de postagem.")
     else:
         try:
             genai.configure(api_key=chave)
             modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
             model = genai.GenerativeModel(modelos[0])
             
-            formatos = []
-            if quer_linkedin: formatos.append(f"Carrossel LinkedIn com EXATAMENTE {slides_qtd} slides de conteúdo + Capa e CTA")
-            if quer_stories: formatos.append("Sequência de 3 Stories (Texto curto e visual)")
-            if quer_feed_meta: formatos.append("Post de Feed (Legenda engajadora + Ideia de Imagem)")
+            # Construção das instruções específicas por canal
+            instrucoes_canais = ""
+            if quer_stories:
+                instrucoes_canais += "\n- STORIES: Texto MÍNIMO. Frases curtas de impacto que caibam em 5 segundos de leitura. Máximo 15 palavras por tela."
+            if quer_feed:
+                instrucoes_canais += "\n- FEED META: Texto completo e engajador, com legenda chamativa e uso de emojis moderados. Foco em benefício direto."
+            if quer_linkedin:
+                instrucoes_canais += f"\n- CARROSSEL LINKEDIN: Texto completo, técnico e com autoridade. Deve ter EXATAMENTE {slides_qtd} slides de conteúdo + Capa e CTA."
 
             prompt = f"""
-            Aja como um Social Media Tech Senior.
-            Base: {texto_noticia}
+            Aja como um Estrategista de Conteúdo B2B de Tecnologia.
+            Notícia Base: {texto_noticia}
             Público: {perfil}
-            Linguagem: Português BR.
+            Idioma: Português Brasil.
 
-            Crie o conteúdo para os seguintes formatos: {', '.join(formatos)}.
-            
-            REGRAS RÍGIDAS:
-            1. Se pediu LinkedIn, o carrossel deve ter {slides_qtd} slides de conteúdo. Nem mais, nem menos.
-            2. Para cada rede, use o tom de voz adequado (LinkedIn mais sério, Meta mais direto).
-            3. Para Stories, foque em frases rápidas que caibam na tela.
+            Gere o conteúdo seguindo estas diretrizes de formato:
+            {instrucoes_canais}
+
+            Regra de Ouro: Adapte o vocabulário. Stories é dinâmico, Feed é informativo, LinkedIn é estratégico e técnico.
             """
             
-            with st.spinner('Orquestrando sua campanha multicanal...'):
+            with st.spinner('Criando sua estratégia multicanal...'):
                 response = model.generate_content(prompt)
-                st.success("✅ Campanha Gerada!")
+                st.success("✅ Conteúdos Gerados!")
                 st.markdown(response.text)
         except Exception as e:
-            st.error(f"Erro: {e}")
+            st.error(f"Erro na geração: {e}")
