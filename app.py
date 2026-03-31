@@ -9,16 +9,10 @@ st.set_page_config(page_title="Tech Intelligence Hub", page_icon="🛡️", layo
 # --- 2. CSS ULTRA BLACK (FORÇADO) ---
 st.markdown("""
     <style>
-    /* Força o fundo preto em absolutamente tudo */
-    [data-testid="stAppViewContainer"], 
-    [data-testid="stHeader"], 
-    [data-testid="stSidebar"], 
-    .main {
+    [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stSidebar"], .main {
         background-color: #000000 !important;
         color: #ffffff !important;
     }
-
-    /* Estilo dos Cards com Vidro e Neon */
     .st-emotion-cache-12w0qpk, .st-emotion-cache-6qob1r { 
         background: rgba(20, 20, 25, 0.9) !important; 
         border: 1px solid rgba(0, 229, 255, 0.4) !important; 
@@ -26,30 +20,17 @@ st.markdown("""
         padding: 25px !important; 
         box-shadow: 0 0 20px rgba(0, 229, 255, 0.1) !important;
     }
-    
-    /* Títulos e Textos Neon */
     h1, h2, h3, p, span, label { color: #ffffff !important; font-family: 'Inter', sans-serif; }
     .neon-green { color: #00ffa3 !important; text-shadow: 0 0 10px rgba(0, 255, 163, 0.5); }
     .neon-purple { color: #bc13fe !important; text-shadow: 0 0 10px rgba(188, 19, 254, 0.5); }
     .step-label { color: #00e5ff !important; font-weight: bold; font-size: 0.8em; text-transform: uppercase; letter-spacing: 2px; }
-    
-    /* Botões com Gradiente */
     .stButton>button {
-        width: 100%;
-        border-radius: 15px !important;
-        height: 4em !important;
+        width: 100%; border-radius: 15px !important; height: 4em !important;
         background: linear-gradient(90deg, #bc13fe, #00e5ff) !important;
-        color: white !important;
-        font-weight: bold !important;
-        border: none !important;
+        color: white !important; font-weight: bold !important; border: none !important;
         box-shadow: 0 0 20px rgba(188, 19, 254, 0.4) !important;
     }
-    .stButton>button:hover { 
-        transform: scale(1.02) !important; 
-        box-shadow: 0 0 40px rgba(0, 229, 255, 0.6) !important; 
-    }
-
-    /* Remove linhas brancas de divisores */
+    .stButton>button:hover { transform: scale(1.02) !important; box-shadow: 0 0 40px rgba(0, 229, 255, 0.6) !important; }
     hr { border-color: rgba(255, 255, 255, 0.1) !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -79,12 +60,15 @@ with st.sidebar:
     }
     canal = st.selectbox("Canal Ativo:", list(fontes.keys()))
     if st.button("🔄 Sincronizar Radar"):
-        f = feedparser.parse(fontes[canal])
-        if f.entries:
-            st.session_state['news'] = f.entries[:10]
+        # Limpa o seletor para evitar notícias duplicadas visualmente
+        st.session_state.pop('news', None)
+        feed = feedparser.parse(fontes[canal])
+        if feed.entries:
+            # Puxamos 20 para ter mais variedade
+            st.session_state['news'] = feed.entries[:20]
             st.session_state.pop('report', None)
             st.session_state.pop('final', None)
-            st.toast("📡 Conexão Estabelecida!")
+            st.toast(f"📡 Radar {canal} Sincronizado!", icon="✅")
 
 # --- 5. INTERFACE PRINCIPAL ---
 st.markdown("# 🛡️ Intelligence <span class='neon-green'>Hub</span>", unsafe_allow_html=True)
@@ -98,7 +82,6 @@ if 'news' in st.session_state:
         noticia = next(n for n in st.session_state['news'] if n.title == escolha)
     
     st.markdown("<br>", unsafe_allow_html=True)
-    
     c1, c2, c3 = st.columns([1, 1, 1.2], gap="large")
 
     with c1:
@@ -107,28 +90,28 @@ if 'news' in st.session_state:
             m = get_model(chave)
             if m:
                 txt = limpar_html(noticia.get('summary', noticia.get('description', '')))
-                prompt = f"Traduza e gere análise comercial B2B tech: {noticia.title}. Resumo: {txt}"
-                with st.spinner("Processando dados..."):
+                prompt = f"Analise: {noticia.title}. Traduza para PT-BR, identifique setores em risco no Brasil e o melhor gancho comercial B2B."
+                with st.spinner("Analisando pauta..."):
                     res = m.generate_content(prompt)
                     st.session_state['report'] = res.text
         
-        relatorio = st.session_state.get('report', 'Aguardando pauta...')
-        st.markdown(f"<div style='background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);'>{relatorio}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);'>{st.session_state.get('report', 'Aguardando pauta...')}</div>", unsafe_allow_html=True)
 
     with c2:
         st.markdown("<p class='step-label'>Step 02</p> ### <span class='neon-purple'>🎨</span> Produção", unsafe_allow_html=True)
         perfil = st.selectbox("Público:", ["Diretores/CTO", "Gerentes de TI", "Especialistas"])
         slides = st.slider("Slides LinkedIn:", 1, 10, 5)
         
-        q_li = st.checkbox("LinkedIn", value=True)
-        q_fd = st.checkbox("Feed Meta")
-        q_st = st.checkbox("Stories")
+        c_check1, c_check2, c_check3 = st.columns(3)
+        q_li = c_check1.checkbox("LinkedIn", value=True)
+        q_fd = c_check2.checkbox("Feed")
+        q_st = c_check3.checkbox("Stories")
 
         if st.button("Gerar Campanha 360º"):
             m = get_model(chave)
             if m and 'report' in st.session_state:
-                prompt_f = f"Com base no report {st.session_state['report']}, crie conteúdo para {perfil}. Canais: LinkedIn ({slides} slides), Feed e Stories. Inclua 3 Hooks e PROMPT IMAGEM: no final."
-                with st.spinner("Orquestrando campanha..."):
+                prompt_f = f"Baseado no report {st.session_state['report']}, crie conteúdo para {perfil} em LinkedIn ({slides} slides), Feed e Stories. Inclua 3 Hooks e PROMPT IMAGEM: no final."
+                with st.spinner("Criando peças..."):
                     res = m.generate_content(prompt_f)
                     st.session_state['final'] = res.text
             else: st.warning("Faça o Passo 01!")
@@ -140,15 +123,11 @@ if 'news' in st.session_state:
             with tab1:
                 st.markdown(f"<div style='background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);'>{st.session_state['final']}</div>", unsafe_allow_html=True)
             with tab2:
-                st.subheader("Prompt Visual (MJ)")
                 try:
                     p_vis = st.session_state['final'].split("PROMPT IMAGEM:")[-1].strip()
                     st.code(p_vis, language="text")
                     st.link_button("🚀 Abrir Midjourney", "https://www.midjourney.com/imagine", use_container_width=True)
-                except:
-                    st.write("Prompt não encontrado.")
-        else:
-            st.info("Aguardando geração do Passo 02.")
-
+                except: st.write("Aguardando prompt...")
+        else: st.info("Aguardando Passo 02.")
 else:
-    st.info("👈 Sincronize o radar na barra lateral para iniciar.")
+    st.info("👈 Sincronize o radar na barra lateral.")
