@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS CUSTOMIZADO (DESIGN PREMIUM) ---
+# --- CSS CUSTOMIZADO ---
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -23,24 +23,20 @@ st.markdown("""
         color: white;
         font-weight: bold;
         border: none;
-        transition: 0.3s;
     }
-    .stButton>button:hover { background-color: #00e676; border: none; color: white; }
-    
     .content-card {
         background-color: #1a1c24;
-        padding: 25px;
-        border-radius: 15px;
+        padding: 20px;
+        border-radius: 12px;
         border: 1px solid #2d2f39;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        margin-bottom: 20px;
         color: white;
+        margin-bottom: 15px;
     }
-    .status-online { color: #00c853; font-weight: bold; font-size: 0.8em; margin-bottom: 10px; }
+    .status-online { color: #00c853; font-weight: bold; font-size: 0.8em; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE APOIO ---
+# --- FUNÇÕES ---
 def limpar_html(texto):
     clean = re.compile('<.*?>')
     return re.sub(clean, '', texto)
@@ -57,9 +53,7 @@ def get_model(api_key):
 with st.sidebar:
     st.title("⚙️ Configurações")
     chave = st.text_input("🔑 Chave API Gemini:", type="password")
-    
     st.markdown("---")
-    st.subheader("📡 Fontes Globais")
     fontes_rss = {
         "CISO Advisor (BR)": "https://www.cisoadvisor.com.br/feed/",
         "Data Center Dynamics (BR)": "https://www.datacenterdynamics.com/br/feed/",
@@ -70,73 +64,67 @@ with st.sidebar:
     fonte_focada = st.selectbox("Radar ativo:", list(fontes_rss.keys()))
     
     if st.button("🔄 Sincronizar Radar"):
-        with st.spinner("Varrendo a web..."):
-            feed = feedparser.parse(fontes_rss[fonte_focada])
-            if feed.entries:
-                st.session_state['noticias_focadas'] = feed.entries[:10]
-                st.session_state.pop('texto_traduzido', None)
-                st.success(f"Radar {fonte_focada} Atualizado!")
-            else:
-                st.error("Falha ao sincronizar fonte.")
+        feed = feedparser.parse(fontes_rss[fonte_focada])
+        if feed.entries:
+            st.session_state['noticias_focadas'] = feed.entries[:10]
+            st.session_state.pop('texto_traduzido', None)
+            st.success("Radar Atualizado!")
 
-# --- DASHBOARD PRINCIPAL ---
+# --- DASHBOARD ---
 st.title("🚀 TechPulse Marketing Hub")
 st.markdown("<p class='status-online'>● AGENTE DE IA ONLINE</p>", unsafe_allow_html=True)
 
 col_news, col_config = st.columns([1.2, 1])
 
 with col_news:
-    st.subheader("📰 Seleção de Pauta")
+    st.subheader("📰 Seleção")
     noticia_selecionada = None
-    
     if 'noticias_focadas' in st.session_state:
         titulos = [n.title for n in st.session_state['noticias_focadas']]
-        escolha = st.selectbox("Escolha a notícia:", titulos)
-        
+        escolha = st.selectbox("Notícia alvo:", titulos)
         for n in st.session_state['noticias_focadas']:
             if n.title == escolha:
                 noticia_selecionada = n
                 break
         
         if noticia_selecionada and st.button("🌍 Traduzir Contexto"):
-            if not chave: st.error("Insira a chave na barra lateral.")
-            else:
-                model = get_model(chave)
-                if model:
-                    texto_limpo = limpar_html(noticia_selecionada.get('summary', noticia_selecionada.get('description', '')))
-                    with st.spinner("Traduzindo..."):
-                        res = model.generate_content(f"Traduza e adapte para Marketing Tech BR:\nTítulo: {noticia_selecionada.title}\nResumo: {texto_limpo}")
-                        st.session_state['texto_traduzido'] = res.text
+            model = get_model(chave)
+            if model:
+                txt = limpar_html(noticia_selecionada.get('summary', noticia_selecionada.get('description', '')))
+                res = model.generate_content(f"Traduza para Marketing Tech BR: {noticia_selecionada.title}. Resumo: {txt}")
+                st.session_state['texto_traduzido'] = res.text
 
     if noticia_selecionada:
-        texto_original = limpar_html(noticia_selecionada.get('summary', noticia_selecionada.get('description', '')))
-        texto_final = st.session_state.get('texto_traduzido', f"**{noticia_selecionada.title}**\n\n{texto_original}")
-        
-        st.markdown(f"""
-            <div class='content-card'>
-                <p style='color: #888; font-size: 0.9em;'>CONTEÚDO BASE:</p>
-                {texto_final}
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.info("Sincronize o radar para começar.")
+        texto_final = st.session_state.get('texto_traduzido', noticia_selecionada.title)
+        st.markdown(f"<div class='content-card'><p style='color:#888'>BASE:</p>{texto_final}</div>", unsafe_allow_html=True)
 
 with col_config:
     st.subheader("🎨 Formatos")
     st.markdown("<div class='content-card'>", unsafe_allow_html=True)
     perfil = st.selectbox("🎯 Público:", ["Diretores", "Gerentes TI", "Técnicos"])
-    slides_qtd = st.number_input("🔢 Slides (LinkedIn):", 1, 10, 5)
-    
-    c1, c2, c3 = st.columns(3)
-    with c1: q_stories = st.checkbox("📱 Stories")
-    with c2: q_feed = st.checkbox("🖼️ Feed")
-    with c3: q_linkedin = st.checkbox("📄 LinkedIn")
+    slides_qtd = st.number_input("🔢 Slides LinkedIn:", 1, 10, 5)
+    q_stories = st.checkbox("📱 Stories")
+    q_feed = st.checkbox("🖼️ Feed")
+    q_linkedin = st.checkbox("📄 LinkedIn")
     st.markdown("</div>", unsafe_allow_html=True)
 
     if st.button("🚀 GERAR CAMPANHA"):
-        if not chave or not noticia_selecionada:
-            st.error("Falta Chave ou Notícia!")
-        else:
-            model = get_model(chave)
-            if model:
-                prompt = f"Gere em Português BR conteúdo para:
+        model = get_model(chave)
+        if model and noticia_selecionada:
+            # Uso de aspas triplas para evitar o erro de Syntax
+            prompt_final = f"""
+            Aja como um Estrategista de Marketing Tech.
+            Base: {texto_final}
+            Público: {perfil}
+            Gere em Português:
+            {'- Stories: Texto mínimo e frases rápidas' if q_stories else ''}
+            {'- Feed Meta: Legenda engajadora e completa' if q_feed else ''}
+            {'- LinkedIn: Carrossel técnico com exatamente ' + str(slides_qtd) + ' slides de conteúdo' if q_linkedin else ''}
+            """
+            with st.spinner("Gerando..."):
+                response = model.generate_content(prompt_final)
+                st.session_state['resultado_final'] = response.text
+
+if 'resultado_final' in st.session_state:
+    st.markdown("---")
+    st.markdown(f"<div class='content-card'><h3>✨ Resultado:</h3>{st.session_state['resultado_final']}</div>", unsafe_allow_html=True)
