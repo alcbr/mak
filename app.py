@@ -45,6 +45,7 @@ if st.button("🔄 Sincronizar Notícias"):
         feed = feedparser.parse(fontes_rss[fonte_focada])
         if feed.entries:
             st.session_state['noticias_focadas'] = feed.entries[:10]
+            st.session_state.pop('texto_traduzido', None) # Limpa tradução anterior
             st.success(f"Radar {fonte_focada} atualizado!")
         else:
             st.error("Erro ao ler o feed.")
@@ -61,7 +62,7 @@ if 'noticias_focadas' in st.session_state:
             noticia_selecionada = n
             break
 
-# --- TRADUÇÃO DA BASE ---
+# --- TRADUÇÃO DA BASE (VERSÃO BLINDADA) ---
 texto_base_final = ""
 if noticia_selecionada:
     texto_original = limpar_html(noticia_selecionada.get('summary', noticia_selecionada.get('description', '')))
@@ -73,19 +74,26 @@ if noticia_selecionada:
         else:
             try:
                 genai.configure(api_key=chave)
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                prompt_traducao = f"Traduza o título e o resumo abaixo para Português do Brasil de forma profissional:\nTítulo: {titulo_original}\nResumo: {texto_original}"
                 
-                with st.spinner('Traduzindo...'):
-                    resultado = model.generate_content(prompt_traducao)
-                    st.session_state['texto_traduzido'] = resultado.text
-                    st.success("Tradução concluída!")
+                # BUSCA AUTOMÁTICA DE MODELO (Corrige o erro 404)
+                modelos_disponiveis = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                
+                if modelos_disponiveis:
+                    model = genai.GenerativeModel(modelos_disponiveis[0])
+                    prompt_traducao = f"Traduza o título e o resumo abaixo para Português do Brasil de forma profissional e técnica:\nTítulo: {titulo_original}\nResumo: {texto_original}"
+                    
+                    with st.spinner(f'Traduzindo com {modelos_disponiveis[0]}...'):
+                        resultado = model.generate_content(prompt_traducao)
+                        st.session_state['texto_traduzido'] = resultado.text
+                        st.success("Tradução concluída!")
+                else:
+                    st.error("Nenhum modelo disponível nesta chave.")
             except Exception as e:
                 st.error(f"Erro na tradução: {e}")
 
-    # Exibe a tradução se ela existir, senão exibe o original limpo
+    # Exibe a tradução se ela existir, senão o original
     texto_para_exibir = st.session_state.get('texto_traduzido', f"Título: {titulo_original}\n\nResumo: {texto_original}")
-    texto_base_final = texto_para_exibir # Esta será a base para os posts
+    texto_base_final = texto_para_exibir
 
     st.markdown(f"""
         <div class="noticia-box">
@@ -115,14 +123,14 @@ with col_num:
 
 if st.button("🚀 Gerar Campanha Completa"):
     if not chave or not texto_base_final:
-        st.error("Verifique a chave API e se a notícia foi selecionada/traduzida.")
+        st.error("Verifique a chave API e a notícia.")
     elif not (quer_stories or quer_feed or quer_linkedin):
         st.warning("Selecione um formato.")
     else:
         try:
             genai.configure(api_key=chave)
-            modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            model = genai.GenerativeModel(modelos[0])
+            modelos_disponiveis = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            model = genai.GenerativeModel(modelos_disponiveis[0])
             
             prompt_final = f"""
             Aja como um Estrategista de Marketing Tech.
@@ -130,14 +138,14 @@ if st.button("🚀 Gerar Campanha Completa"):
             Público: {perfil}
             
             Gere em PORTUGUÊS:
-            {"- STORIES: Texto minimalista (máx 15 palavras por tela)." if quer_stories else ""}
-            {"- FEED META: Texto engajador com legenda estratégica." if quer_feed else ""}
-            {"- LINKEDIN: Post técnico estruturado em "+str(slides_qtd)+" slides." if quer_linkedin else ""}
+            {"- STORIES: Texto minimalista (máx 15 palavras por tela), frases de impacto." if quer_stories else ""}
+            {"- FEED META: Texto engajador com legenda estratégica e emojis." if quer_feed else ""}
+            {"- LINKEDIN: Post técnico e estratégico estruturado em exatamente "+str(slides_qtd)+" slides de conteúdo + Capa e CTA." if quer_linkedin else ""}
             """
             
-            with st.spinner('Criando posts...'):
+            with st.spinner('Criando posts multicanal...'):
                 response = model.generate_content(prompt_final)
-                st.success("✅ Conteúdos Gerados!")
+                st.success("✅ Campanha Gerada!")
                 st.markdown(response.text)
         except Exception as e:
             st.error(f"Erro: {e}")
