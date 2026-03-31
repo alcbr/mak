@@ -2,28 +2,30 @@ import streamlit as st
 import google.generativeai as genai
 import feedparser
 
-# Configuração da página - Visual Profissional
-st.set_page_config(page_title="Tech Content Factory", page_icon="🚀", layout="wide")
+# Configuração da página
+st.set_page_config(page_title="Tech Content Factory Pro", page_icon="🚀", layout="wide")
 
-st.title("🚀 Tech Content Factory: Notícias & Carrosséis")
+st.title("🚀 Tech Content Factory: Global Radar")
 st.markdown("---")
 
-# Barra Lateral - Configurações
+# Barra Lateral
 with st.sidebar:
     st.header("⚙️ Configurações")
     chave = st.text_input("Sua Chave API Gemini:", type="password")
     st.markdown("---")
-    st.info("Selecione uma notícia à direita e gere o conteúdo automaticamente.")
+    st.info("O sistema agora traduz notícias globais automaticamente para carrosséis em Português.")
 
-# Dicionário com os seus 3 sites favoritos
+# Dicionário atualizado com as 5 fontes (BR + EN)
 fontes_rss = {
-    "Data Center Dynamics": "https://www.datacenterdynamics.com/br/feed/",
-    "CISO Advisor": "https://www.cisoadvisor.com.br/feed/",
-    "Convergência Digital": "https://www.convergenciadigital.com.br/rss/rss.xml"
+    "CISO Advisor (BR)": "https://www.cisoadvisor.com.br/feed/",
+    "Data Center Dynamics (BR)": "https://www.datacenterdynamics.com/br/feed/",
+    "Convergência Digital (BR)": "https://www.convergenciadigital.com.br/rss/rss.xml",
+    "The Hacker News (EN)": "https://feeds.feedburner.com/TheHackersNews",
+    "SecurityWeek (EN)": "https://www.securityweek.com/feed/"
 }
 
-# --- PARTE 1: RADAR DE NOTÍCIAS (MANTIDO) ---
-st.subheader("🔍 1. Radar de Notícias: Selecione a Base do Post")
+# --- PARTE 1: RADAR DE NOTÍCIAS ---
+st.subheader("🔍 1. Radar Global: Selecione a Base do Post")
 
 col_fontes, col_lista = st.columns([1, 2])
 
@@ -32,8 +34,11 @@ with col_fontes:
     if st.button("🔄 Sincronizar Notícias"):
         try:
             feed = feedparser.parse(fontes_rss[fonte_focada])
-            st.session_state['noticias_focadas'] = feed.entries[:8]
-            st.success("Radar Atualizado!")
+            if not feed.entries:
+                st.error("Não consegui carregar este feed. Tente outra fonte.")
+            else:
+                st.session_state['noticias_focadas'] = feed.entries[:8]
+                st.success(f"Radar {fonte_focada} Atualizado!")
         except Exception as e:
             st.error(f"Erro ao buscar: {e}")
 
@@ -41,46 +46,65 @@ with col_lista:
     texto_noticia = ""
     if 'noticias_focadas' in st.session_state:
         titulos = [n.title for n in st.session_state['noticias_focadas']]
-        escolha = st.selectbox("Escolha a notícia para transformar em Carrossel:", titulos)
+        escolha = st.selectbox("Escolha a notícia (mesmo em inglês):", titulos)
         
         for n in st.session_state['noticias_focadas']:
             if n.title == escolha:
                 texto_noticia = n.get('summary', n.get('description', 'Sem resumo disponível.'))
-                st.info(f"**Resumo da Notícia:** {texto_noticia[:250]}...")
+                st.info(f"**Conteúdo Original:** {texto_noticia[:300]}...")
                 break
 
-# --- PARTE 2: GERAÇÃO DE CARROSSEL (NOVA FUNÇÃO) ---
+# --- PARTE 2: GERAÇÃO DE CARROSSEL COM TRADUÇÃO ---
 st.markdown("---")
-st.subheader("🎨 2. Criador de Carrossel para LinkedIn")
+st.subheader("🎨 2. Tradutor & Criador de Carrossel")
 
 if texto_noticia:
     col_input, col_config = st.columns([2, 1])
     
     with col_input:
-        input_ia = st.text_area("Edite o texto da notícia se precisar:", value=texto_noticia, height=150)
+        input_ia = st.text_area("Texto base (pode estar em inglês):", value=texto_noticia, height=150)
     
     with col_config:
-        perfil = st.selectbox("Público-alvo:", ["Diretores (C-Level)", "Gerentes de TI", "Analistas Técnicos"])
-        slides = st.slider("Quantidade de slides de conteúdo:", 3, 7, 5)
+        perfil = st.selectbox("Público-alvo no Brasil:", ["Diretores (C-Level)", "Gerentes de TI", "Analistas Técnicos"])
+        slides = st.slider("Slides de conteúdo:", 3, 7, 5)
 
-    if st.button("🚀 Gerar Roteiro de Carrossel"):
+    if st.button("🚀 Traduzir e Gerar Carrossel"):
         if not chave:
             st.error("Insira a chave API na barra lateral!")
         else:
             try:
                 genai.configure(api_key=chave)
-                # Seleciona modelo disponível
-                models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                model = genai.GenerativeModel(models[0])
+                # Tenta o modelo mais atualizado
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 
                 prompt = f"""
-                Aja como um Designer de Conteúdo B2B focado em tecnologia. 
-                Crie um roteiro de carrossel para LinkedIn baseado na notícia: {input_ia}.
-                O público é {perfil}.
+                Você é um Estrategista de Marketing Tech B2B Bilíngue.
+                Sua tarefa é ler a notícia abaixo (que pode estar em inglês ou português) e criar um roteiro de carrossel para LinkedIn TOTALMENTE EM PORTUGUÊS.
                 
-                Formato de saída:
-                - Slide 1: Capa (Título Magnético e Gancho))
-                st.success("✅ Insight Gerado!")
-                st.markdown(response.text)
-        except Exception as e:
-            st.error(f"Erro na IA: {e}")
+                O público-alvo são {perfil} brasileiros.
+                
+                Instruções de Saída (EM PORTUGUÊS):
+                - Slide 1: Capa (Título Magnético traduzido para o contexto BR)
+                - Slides 2 a {slides + 1}: Conteúdo técnico simplificado e estratégico (Título, texto em tópicos e sugestão visual)
+                - Slide Final: CTA (Chamada para ação para marketing tech)
+                
+                Notícia Base: 
+                {input_ia}
+                """
+                
+                with st.spinner('Lendo notícia global e criando roteiro em Português...'):
+                    response = model.generate_content(prompt)
+                    st.success("✅ Roteiro Traduzido e Gerado!")
+                    st.divider()
+                    st.markdown(response.text)
+            except Exception as e:
+                # Fallback para o modelo Pro se o Flash falhar
+                try:
+                    model = genai.GenerativeModel('gemini-pro')
+                    response = model.generate_content(prompt)
+                    st.success("✅ Gerado com sucesso (Modelo Pro)!")
+                    st.markdown(response.text)
+                except:
+                    st.error(f"Erro na conexão com a IA: {e}")
+else:
+    st.warning("Sincronize e selecione uma notícia acima para começar.")
