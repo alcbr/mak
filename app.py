@@ -6,40 +6,14 @@ import re
 # --- CONFIGURAÇÕES DE PÁGINA ---
 st.set_page_config(page_title="TechPulse Agency Pro", page_icon="⚡", layout="wide")
 
-# --- CSS PARA DESIGN CENTRALIZADO E BOTÃO DESABILITADO ---
+# --- CSS DESIGN ---
 st.markdown("""
     <style>
-    /* Centraliza e limita a largura da pauta para a seta não fugir */
-    .pauta-container {
-        max-width: 800px;
-        margin: 0 auto;
-        padding-bottom: 20px;
-    }
-    
-    /* Estilo dos Cards */
-    .content-card {
-        background-color: #1a1c24;
-        padding: 20px;
-        border-radius: 12px;
-        border: 1px solid #2d2f39;
-        color: white;
-        min-height: 100px;
-    }
-    
-    /* Botão Verde Padrão */
-    .stButton>button {
-        background-color: #00c853 !important;
-        color: white !important;
-        font-weight: bold !important;
-        border: none !important;
-    }
-
-    /* Botão Desabilitado (Cinza) */
-    .stButton>button:disabled {
-        background-color: #333 !important;
-        color: #777 !important;
-        cursor: not-allowed;
-    }
+    .pauta-container { max-width: 800px; margin: 0 auto; padding-bottom: 20px; }
+    .content-card { background-color: #1a1c24; padding: 20px; border-radius: 12px; border: 1px solid #2d2f39; color: white; margin-bottom: 15px; }
+    .img-prompt-card { background-color: #0d1117; border: 1px dashed #00c853; padding: 15px; border-radius: 10px; color: #00c853; font-family: monospace; }
+    .stButton>button { background-color: #00c853 !important; color: white !important; font-weight: bold !important; border: none !important; }
+    .stButton>button:disabled { background-color: #333 !important; color: #777 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -49,7 +23,6 @@ def limpar_html(texto):
     return re.sub(clean, '', texto)
 
 def noticia_e_estrangeira(url):
-    # Se não tiver .br no link ou for securityweek/hackernews, consideramos estrangeira
     paises_pt = ['.br', 'convergenciadigital', 'cisoadvisor']
     return not any(p in url.lower() for p in paises_pt)
 
@@ -78,13 +51,13 @@ with st.sidebar:
         if feed.entries:
             st.session_state['noticias_focadas'] = feed.entries[:10]
             st.session_state.pop('base_traduzida', None)
+            st.session_state.pop('full_campaign', None)
             st.success("Radar Atualizado!")
 
-# --- DASHBOARD PRINCIPAL ---
+# --- DASHBOARD ---
 st.title("⚡ TechPulse Agency Pro")
 
 if 'noticias_focadas' in st.session_state:
-    # Container centralizado para a pauta (Seta próxima do texto)
     st.markdown('<div class="pauta-container">', unsafe_allow_html=True)
     escolha = st.selectbox("🎯 Selecione a Pauta do Dia:", [n.title for n in st.session_state['noticias_focadas']])
     st.markdown('</div>', unsafe_allow_html=True)
@@ -97,16 +70,8 @@ if 'noticias_focadas' in st.session_state:
     
     with col_a:
         st.subheader("📰 Conteúdo Base")
-        
-        # Lógica do Botão de Tradução
-        if precisa_traduzir:
-            label_btn = "🌍 Traduzir Conteúdo (EN -> PT)"
-            bloqueado = False
-        else:
-            label_btn = "✅ Notícia já em Português"
-            bloqueado = True
-
-        if st.button(label_btn, disabled=bloqueado):
+        label_btn = "🌍 Traduzir Conteúdo (EN -> PT)" if precisa_traduzir else "✅ Notícia já em Português"
+        if st.button(label_btn, disabled=not precisa_traduzir):
             model = get_model(chave)
             if model:
                 txt = limpar_html(noticia_alvo.get('summary', noticia_alvo.get('description', '')))
@@ -114,7 +79,6 @@ if 'noticias_focadas' in st.session_state:
                     res = model.generate_content(f"Traduza para Marketing Tech BR: {noticia_alvo.title}. Resumo: {txt}")
                     st.session_state['base_traduzida'] = res.text
 
-        # Exibição do Texto
         base_texto = st.session_state.get('base_traduzida', f"**{noticia_alvo.title}**\n\n{limpar_html(noticia_alvo.get('summary', noticia_alvo.get('description', '')))}")
         st.markdown(f"<div class='content-card'>{base_texto}</div>", unsafe_allow_html=True)
 
@@ -122,27 +86,33 @@ if 'noticias_focadas' in st.session_state:
         st.subheader("🎨 Configuração da Campanha")
         perfil = st.selectbox("👥 Público:", ["Diretores/C-Level", "Gerentes de TI", "Especialistas"])
         slides = st.number_input("🔢 Slides Carrossel:", 1, 10, 5)
-        
-        st.write("Canais:")
+        st.write("Canais Ativos:")
         c1, c2, c3 = st.columns(3)
-        q_st = c1.checkbox("Stories")
-        q_fd = c2.checkbox("Feed")
-        q_li = c3.checkbox("LinkedIn")
+        q_st, q_fd, q_li = c1.checkbox("Stories"), c2.checkbox("Feed"), c3.checkbox("LinkedIn")
         
-        if st.button("🚀 GERAR CAMPANHA 360º"):
-            if not chave: st.error("Falta Chave API!")
-            else:
-                model = get_model(chave)
-                if model:
-                    prompt = f"""Aja como Diretor de Criação Tech. Base: {base_texto}. Público: {perfil}.
-                    Gere conteúdo para: {'Stories,' if q_st else ''} {'Feed,' if q_fd else ''} {'LinkedIn ('+str(slides)+' slides).' if q_li else ''}
-                    Crie também 3 Hooks, Prompt Visual e Agendamento."""
-                    with st.spinner("Orquestrando campanha..."):
-                        response = model.generate_content(prompt)
-                        st.session_state['full_campaign'] = response.text
+        if st.button("🚀 GERAR CAMPANHA & IMAGEM"):
+            model = get_model(chave)
+            if model:
+                prompt = f"""Aja como Diretor de Criação Tech. Base: {base_texto}. Público: {perfil}.
+                1. Gere os roteiros para os canais marcados.
+                2. Crie 3 'Hooks' magnéticos.
+                3. PROMPT DE IMAGEM: Crie um prompt detalhado em INGLÊS para uma IA geradora de imagens (estilo 3D Tech, Cinematic, 8k, futurista) que ilustre perfeitamente esta notícia. Comece com 'Visual Prompt for AI Generator:'"""
+                with st.spinner("IA Orquestrando Campanha..."):
+                    response = model.generate_content(prompt)
+                    st.session_state['full_campaign'] = response.text
 
 # --- RESULTADOS ---
 if 'full_campaign' in st.session_state:
     st.markdown("---")
-    st.subheader("✨ Campanha Pronta")
-    st.markdown(f"<div class='content-card'>{st.session_state['full_campaign']}</div>", unsafe_allow_html=True)
+    tab_txt, tab_img = st.tabs(["📄 Roteiros e Estratégia", "🎨 Gerador de Imagem"])
+    
+    with tab_txt:
+        st.markdown(f"<div class='content-card'>{st.session_state['full_campaign']}</div>", unsafe_allow_html=True)
+    
+    with tab_img:
+        st.subheader("🖼️ Identidade Visual do Post")
+        st.write("Copie o comando abaixo e cole no Midjourney, DALL-E ou Canva AI:")
+        # Extrai apenas o prompt de imagem do texto da IA (simplificado)
+        prompt_visual = st.session_state['full_campaign'].split("Visual Prompt for AI Generator:")[-1]
+        st.markdown(f"<div class='img-prompt-card'>{prompt_visual}</div>", unsafe_allow_html=True)
+        st.info("💡 Dica: Imagens com tons de azul escuro e verde neon passam mais autoridade em TI.")
