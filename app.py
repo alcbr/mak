@@ -22,13 +22,13 @@ st.markdown("""
         backdrop-filter: blur(10px);
     }
     
-    /* Títulos com Gradiente e Brilho */
-    h1, h2, h3 { font-family: 'Inter', sans-serif; font-weight: 800; color: #ffffff !important; letter-spacing: -1px; }
+    /* Títulos e Textos */
+    h1, h2, h3 { font-family: 'Inter', sans-serif; font-weight: 800; color: #ffffff !important; }
     .neon-green { color: #00ffa3; text-shadow: 0 0 10px rgba(0, 255, 163, 0.4); }
     .neon-purple { color: #bc13fe; text-shadow: 0 0 10px rgba(188, 19, 254, 0.4); }
     .step-label { color: #00e5ff; font-weight: bold; font-size: 0.8em; text-transform: uppercase; letter-spacing: 2px; }
     
-    /* Botões Futuristas Ultra */
+    /* Botões Ultra Modernos */
     .stButton>button {
         width: 100%;
         border-radius: 15px;
@@ -39,26 +39,21 @@ st.markdown("""
         border: none !important;
         box-shadow: 0 0 20px rgba(188, 19, 254, 0.3);
         transition: all 0.5s ease;
-        text-transform: uppercase;
     }
     .stButton>button:hover { 
         transform: scale(1.02); 
         box-shadow: 0 0 35px rgba(0, 229, 255, 0.5); 
-        filter: brightness(1.2);
     }
     
-    /* Card de Conteúdo Interno */
+    /* Conteúdo dos Cards */
     .content-card {
-        background-color: rgba(0, 0, 0, 0.6);
-        padding: 25px;
+        background-color: rgba(0, 0, 0, 0.5);
+        padding: 20px;
         border-radius: 15px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.05);
         color: #f1f5f9;
         line-height: 1.8;
     }
-
-    /* Ajuste de Inputs */
-    .stSelectbox, .stNumberInput { margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -86,10 +81,13 @@ with st.sidebar:
         "Convergência Digital (BR)": "https://www.convergenciadigital.com.br/rss/rss.xml"
     }
     canal = st.selectbox("Canal Ativo:", list(fontes.keys()))
-    if st.button("🔄 Sincronizar"):
+    if st.button("🔄 Sincronizar Radar"):
         f = feedparser.parse(fontes[canal])
         if f.entries:
             st.session_state['news'] = f.entries[:10]
+            # Limpa estados anteriores para evitar confusão entre notícias
+            st.session_state.pop('report', None)
+            st.session_state.pop('final', None)
             st.toast("📡 Conexão Estabelecida!")
 
 # --- 5. INTERFACE PRINCIPAL ---
@@ -97,11 +95,13 @@ st.markdown("# 🛡️ Intelligence <span class='neon-green'>Hub</span>", unsafe
 st.markdown("---")
 
 if 'news' in st.session_state:
-    # Seleção de Pauta Centralizada
+    # Seletor de Pauta Centralizado (Corrigido para não dar erro)
     _, col_mid, _ = st.columns([0.5, 2, 0.5])
     with col_mid:
-        escolha = st.selectbox("🎯 Selecione a notícia alvo:", [n.title for n in st.session_state['news']])
-        noticia = next(n for n in st.news if n.title == escolha)
+        titulos = [n.title for n in st.session_state['news']]
+        escolha = st.selectbox("🎯 Selecione a notícia alvo:", titulos)
+        # CORREÇÃO AQUI: Usando st.session_state['news']
+        noticia = next(n for n in st.session_state['news'] if n.title == escolha)
     
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -118,12 +118,14 @@ if 'news' in st.session_state:
                     res = m.generate_content(prompt)
                     st.session_state['report'] = res.text
         
-        st.markdown(f"<div class='content-card'>{st.session_state.get('report', 'Aguardando pauta...')}</div>", unsafe_allow_html=True)
+        relatorio = st.session_state.get('report', 'Aguardando pauta...')
+        st.markdown(f"<div class='content-card'>{relatorio}</div>", unsafe_allow_html=True)
 
     with c2:
         st.markdown("<p class='step-label'>Step 02</p> ### <span class='neon-purple'>🎨</span> Produção", unsafe_allow_html=True)
         perfil = st.selectbox("Público:", ["Diretores/CTO", "Gerentes de TI", "Especialistas"])
         slides = st.slider("Slides LinkedIn:", 1, 10, 5)
+        
         q_li = st.checkbox("LinkedIn", value=True)
         q_fd = st.checkbox("Feed Meta")
         q_st = st.checkbox("Stories")
@@ -135,7 +137,7 @@ if 'news' in st.session_state:
                 with st.spinner("Orquestrando campanha..."):
                     res = m.generate_content(prompt_f)
                     st.session_state['final'] = res.text
-            else: st.warning("Faça o Passo 01!")
+            else: st.warning("Faça o Passo 01 primeiro!")
 
     with c3:
         st.markdown("<p class='step-label'>Step 03</p> ### <span class='neon-purple'>✨</span> Resultados", unsafe_allow_html=True)
@@ -145,9 +147,12 @@ if 'news' in st.session_state:
                 st.markdown(f"<div class='content-card'>{st.session_state['final']}</div>", unsafe_allow_html=True)
             with tab2:
                 st.subheader("Prompt Visual (MJ)")
-                p_vis = st.session_state['final'].split("PROMPT IMAGEM:")[-1].strip()
-                st.code(p_vis, language="text")
-                st.link_button("🚀 Abrir Midjourney", "https://www.midjourney.com/imagine", use_container_width=True)
+                try:
+                    p_vis = st.session_state['final'].split("PROMPT IMAGEM:")[-1].strip()
+                    st.code(p_vis, language="text")
+                    st.link_button("🚀 Abrir Midjourney", "https://www.midjourney.com/imagine", use_container_width=True)
+                except:
+                    st.write("Prompt não encontrado no texto gerado.")
         else:
             st.info("Aguardando geração do Passo 02.")
 
