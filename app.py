@@ -3,15 +3,52 @@ import google.generativeai as genai
 import feedparser
 import re
 
-# --- 1. CONFIGURAÇÃO ---
+# --- 1. CONFIGURAÇÃO E IDENTIDADE ---
 st.set_page_config(page_title="Tech Intelligence Hub", page_icon="🛡️", layout="wide")
 
-# --- 2. DESIGN ---
+# --- 2. CSS PREMIUM CUSTOMIZADO ---
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    .stButton>button { background-color: #00c853 !important; color: white !important; font-weight: bold; border: none; }
-    .card { background-color: #1a1c24; padding: 20px; border-radius: 12px; border: 1px solid #2d2f39; color: white; margin-bottom: 15px; }
+    /* Fundo e Container */
+    .main { background-color: #0b0e14; color: #e0e0e0; }
+    
+    /* Cards Modernos */
+    .st-emotion-cache-12w0qpk { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; }
+    
+    /* Títulos e Divisores */
+    h1, h2, h3 { font-family: 'Inter', sans-serif; font-weight: 700; color: #ffffff !important; }
+    .step-number { color: #00c853; font-weight: bold; font-size: 1.2em; margin-right: 10px; }
+    
+    /* Botões Dinâmicos */
+    .stButton>button {
+        width: 100%;
+        border-radius: 10px;
+        height: 3.5em;
+        background-color: #00c853 !important;
+        color: white !important;
+        font-weight: bold !important;
+        border: none !important;
+        box-shadow: 0 4px 15px rgba(0, 200, 83, 0.2);
+        transition: 0.3s;
+    }
+    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 200, 83, 0.4); }
+    
+    /* Seletores e Inputs */
+    .stSelectbox, .stNumberInput { margin-bottom: 20px; }
+    
+    /* Card de Conteúdo Base */
+    .content-card {
+        background: linear-gradient(145deg, #1c2128, #161b22);
+        padding: 25px;
+        border-radius: 16px;
+        border: 1px solid #30363d;
+        color: #d1d5db;
+        line-height: 1.6;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    /* Badge de Sentimento */
+    .badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8em; font-weight: bold; background: #238636; color: white; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -26,10 +63,10 @@ def get_model(key):
         return genai.GenerativeModel(modelos[0])
     except: return None
 
-# --- 4. BARRA LATERAL ---
+# --- 4. BARRA LATERAL (SETUP) ---
 with st.sidebar:
-    st.title("🛡️ Tech Intelligence")
-    chave = st.text_input("Chave API Gemini:", type="password")
+    st.title("🛡️ Setup")
+    chave = st.text_input("Gemini API Key:", type="password", help="Insira sua chave do Google AI Studio")
     st.divider()
     fontes = {
         "The Hacker News (EN)": "https://feeds.feedburner.com/TheHackersNews",
@@ -38,77 +75,85 @@ with st.sidebar:
         "Data Center Dynamics (BR)": "https://www.datacenterdynamics.com/br/feed/",
         "Convergência Digital (BR)": "https://www.convergenciadigital.com.br/rss/rss.xml"
     }
-    canal = st.selectbox("Fonte de Dados:", list(fontes.keys()))
+    canal = st.selectbox("Radar Ativo:", list(fontes.keys()))
     if st.button("🔄 Sincronizar Radar"):
         f = feedparser.parse(fontes[canal])
         if f.entries:
             st.session_state['news'] = f.entries[:10]
-            st.success("Radar pronto!")
+            st.toast("Notícias atualizadas!", icon="📡")
 
-# --- 5. PAINEL PRINCIPAL ---
+# --- 5. INTERFACE PRINCIPAL ---
+st.title("🛡️ Tech Intelligence <span style='color:#00c853'>Hub</span>", unsafe_allow_html=True)
+st.markdown("---")
+
 if 'news' in st.session_state:
-    st.title("🛡️ Central de Inteligência e Prospecção")
+    # Seleção de Pauta Centralizada e Elegante
+    c_pauta1, c_pauta2, c_pauta3 = st.columns([1, 2, 1])
+    with c_pauta2:
+        escolha = st.selectbox("🎯 Notícia Alvo:", [n.title for n in st.session_state['news']])
+        noticia = next(n for n in st.session_state['news'] if n.title == escolha)
     
-    escolha = st.selectbox("🎯 Selecione a Pauta:", [n.title for n in st.session_state['news']])
-    noticia = next(n for n in st.session_state['news'] if n.title == escolha)
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    col_l, col_r = st.columns([1, 1])
+    col1, col2, col3 = st.columns([1, 1, 1.2], gap="large")
 
-    with col_l:
-        st.subheader("📰 Análise Estratégica")
-        if st.button("🔍 Gerar Inteligência B2B"):
+    # --- PASSO 1: INTELIGÊNCIA ---
+    with col1:
+        st.markdown("### <span class='step-number'>01</span> Inteligência", unsafe_allow_html=True)
+        st.write("Analise o impacto e descubra oportunidades.")
+        
+        if st.button("🔍 Gerar Flash Report"):
             m = get_model(chave)
             if m:
                 txt = limpar_html(noticia.get('summary', noticia.get('description', '')))
-                prompt = f"""
-                Analise esta notícia: {noticia.title}. Conteúdo: {txt}.
-                1. Traduza para Português BR.
-                2. RADAR DE PROSPECÇÃO: Quais os 3 setores da economia no Brasil que mais precisam saber disso agora e por quê?
-                3. GANCHO COMERCIAL: Como abordar um cliente usando esta notícia de forma profissional?
-                """
-                with st.spinner("IA processando estratégia..."):
+                prompt = f"Analise: {noticia.title}. Traduza para PT-BR, identifique 3 setores em risco no Brasil e o melhor gancho comercial."
+                with st.spinner("Processando..."):
                     res = m.generate_content(prompt)
-                    st.session_state['inteligencia'] = res.text
+                    st.session_state['report'] = res.text
+        
+        report_display = st.session_state.get('report', "Aguardando análise...")
+        st.markdown(f"<div class='content-card'>{report_display}</div>", unsafe_allow_html=True)
 
-        base = st.session_state.get('inteligencia', f"Notícia: {noticia.title}")
-        st.markdown(f"<div class='card'>{base}</div>", unsafe_allow_html=True)
-
-    with col_r:
-        st.subheader("🎨 Conteúdo para Redes")
-        perfil = st.selectbox("Público-alvo:", ["Diretores/CTO", "Gerentes de TI", "Especialistas"])
-        slides = st.number_input("Slides (LinkedIn):", 1, 10, 5)
+    # --- PASSO 2: ESTRATÉGIA ---
+    with col2:
+        st.markdown("### <span class='step-number'>02</span> Estratégia", unsafe_allow_html=True)
+        st.write("Configure os canais e o público.")
+        
+        público = st.selectbox("Público-alvo:", ["Diretores/CTO", "Gerentes de TI", "Especialistas"])
+        qtd_slides = st.slider("Slides do Carrossel:", 1, 10, 5)
         
         st.write("Canais Ativos:")
-        c1, c2, c3 = st.columns(3)
-        q_li = c1.checkbox("LinkedIn")
-        q_fd = c2.checkbox("Feed Meta")
-        q_st = c3.checkbox("Stories")
+        q_li = st.checkbox("LinkedIn (Carrossel/Post)", value=True)
+        q_fd = st.checkbox("Feed Meta")
+        q_st = st.checkbox("Stories")
 
-        if st.button("🚀 GERAR CAMPANHA COMPLETA"):
+        if st.button("🚀 Gerar Campanha"):
             m = get_model(chave)
-            if m:
-                prompt_final = f"""
-                Baseado nesta inteligência: {base}. Público: {perfil}.
-                Gere conteúdo em Português para:
-                {'- Post LinkedIn (técnico e autoridade em '+str(slides)+' slides)' if q_li else ''}
-                {'- Post Feed Meta (completo e informativo)' if q_fd else ''}
-                {'- Stories (rápido e impactante)' if q_st else ''}
-                Inclua 3 Títulos Magnéticos e um PROMPT IMAGEM: detalhado no final.
-                """
-                with st.spinner("Criando peças de marketing..."):
-                    res = m.generate_content(prompt_final)
-                    st.session_state['campanha_final'] = res.text
+            if m and 'report' in st.session_state:
+                prompt_full = f"Com base no report: {st.session_state['report']}. Crie conteúdo para {público} em {qtd_slides} slides no LinkedIn, Feed e Stories. Inclua 3 Hooks e um PROMPT IMAGEM: no final."
+                with st.spinner("Criando peças..."):
+                    res = m.generate_content(prompt_full)
+                    st.session_state['final_txt'] = res.text
+            else:
+                st.warning("Gere o Flash Report primeiro!")
 
-# --- 6. RESULTADOS ---
-if 'campanha_final' in st.session_state:
-    st.divider()
-    t1, t2 = st.tabs(["📄 Roteiros de Conteúdo", "🎨 Visual & Imagens"])
-    
-    with t1:
-        st.markdown(f"<div class='card'>{st.session_state['campanha_final']}</div>", unsafe_allow_html=True)
-    
-    with t2:
-        st.subheader("Prompt Visual (Midjourney/DALL-E)")
-        p_visual = st.session_state['campanha_final'].split("PROMPT IMAGEM:")[-1].strip()
-        st.code(p_visual, language="text")
-        st.link_button("🚀 Abrir Midjourney", "https://www.midjourney.com/imagine", use_container_width=True)
+    # --- PASSO 3: ENTREGA ---
+    with col3:
+        st.markdown("### <span class='step-number'>03</span> Resultados", unsafe_allow_html=True)
+        st.write("Copie os roteiros e gere os visuais.")
+        
+        if 'final_txt' in st.session_state:
+            tab_post, tab_visual = st.tabs(["📄 Roteiros", "🎨 Visual"])
+            
+            with tab_post:
+                st.markdown(f"<div class='content-card'>{st.session_state['final_txt']}</div>", unsafe_allow_html=True)
+            
+            with tab_visual:
+                p_visual = st.session_state['final_txt'].split("PROMPT IMAGEM:")[-1].strip()
+                st.code(p_visual, language="text")
+                st.link_button("🚀 Abrir Midjourney", "https://www.midjourney.com/imagine")
+        else:
+            st.info("O resultado aparecerá aqui após o Passo 02.")
+
+else:
+    st.info("👈 Comece sincronizando o radar na barra lateral.")
