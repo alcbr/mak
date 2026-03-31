@@ -2,70 +2,79 @@ import streamlit as st
 import google.generativeai as genai
 import feedparser
 
-st.set_page_config(page_title="TechPulse Analyst v2", page_icon="📈", layout="wide")
+# Configuração da página
+st.set_page_config(page_title="TechPulse Radar Pro", page_icon="📡", layout="wide")
 
-st.title("🤖 TechPulse: Radar & Analista de Marketing")
+st.title("📡 Radar de Inteligência: Mercado Tech")
 st.markdown("---")
 
-# Configurações na Barra Lateral
+# Barra Lateral
 with st.sidebar:
     st.header("⚙️ Configurações")
-    chave = st.text_input("Cole sua Chave API do Gemini aqui:", type="password")
+    chave = st.text_input("Sua Chave API Gemini:", type="password")
     st.markdown("---")
-    st.write("📡 **Fontes de Notícias:** G1 Tecnologia")
+    fonte_escolhida = st.radio(
+        "Escolha a Fonte de Notícias:",
+        ("Data Center Dynamics", "CISO Advisor", "Convergência Digital")
+    )
 
-# --- NOVO: BUSCA AUTOMÁTICA DE NOTÍCIAS ---
-st.subheader("🔍 1. Radar de Notícias Automático")
-if st.button("🔄 Buscar Últimas Notícias do Setor"):
+# Dicionário com os links de RSS dos sites que você mandou
+fontes_rss = {
+    "Data Center Dynamics": "https://www.datacenterdynamics.com/br/feed/",
+    "CISO Advisor": "https://www.cisoadvisor.com.br/feed/",
+    "Convergência Digital": "https://www.convergenciadigital.com.br/rss/rss.xml"
+}
+
+# --- BUSCA DE NOTÍCIAS ---
+st.subheader(f"🔍 Últimas de: {fonte_escolhida}")
+
+if st.button("🔄 Sincronizar Notícias"):
     try:
-        # Puxando o feed de notícias do G1 Tecnologia
-        feed = feedparser.parse("https://g1.globo.com/rss/g1/tecnologia/")
-        st.session_state['noticias'] = feed.entries[:5] # Pega as 5 mais recentes
-        st.success("Notícias atualizadas!")
+        url_feed = fontes_rss[fonte_escolhida]
+        feed = feedparser.parse(url_feed)
+        
+        if not feed.entries:
+            st.error("Não consegui ler o feed desse site no momento. Tente outro.")
+        else:
+            st.session_state['lista_noticias'] = feed.entries[:8] # Pega as 8 últimas
+            st.success(f"Radar atualizado com sucesso!")
     except Exception as e:
-        st.error(f"Erro ao buscar notícias: {e}")
+        st.error(f"Erro ao acessar o site: {e}")
 
-# Seleção de notícia encontrada
-if 'noticias' in st.session_state:
-    opcoes = {n.title: n.description for n in st.session_state['noticias']}
-    escolha = st.selectbox("Escolha uma notícia para analisar:", list(opcoes.keys()))
-    if escolha:
-        texto_para_analisar = opcoes[escolha]
-        st.info(f"**Resumo da notícia selecionada:** {texto_para_analisar}")
-else:
-    texto_para_analisar = ""
+# Seleção da Notícia
+texto_para_ia = ""
+if 'lista_noticias' in st.session_state:
+    titulos = [n.title for n in st.session_state['lista_noticias']]
+    escolha_titulo = st.selectbox("Selecione a notícia para gerar o Insight:", titulos)
+    
+    # Encontra o resumo da notícia escolhida
+    for n in st.session_state['lista_noticias']:
+        if n.title == escolha_titulo:
+            texto_para_ia = n.get('summary', n.get('description', 'Sem resumo disponível.'))
+            st.info(f"**Prévia da Notícia:** {texto_para_ia[:300]}...")
+            break
 
 st.markdown("---")
 
-# --- ANÁLISE DE IA ---
-st.subheader("💡 2. Gerar Estratégia de Marketing")
+# --- ANÁLISE DE MARKETING ---
+st.subheader("💡 Gerar Estratégia de Marketing")
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    # Se escolheu uma notícia acima, ela preenche aqui automaticamente
-    # Mas você ainda pode colar um texto manual se quiser
-    input_final = st.text_area("Texto final para análise (notícia automática ou cole aqui):", 
-                              value=texto_para_analisar, height=150)
+    final_input = st.text_area("Contexto para a IA (pode editar o texto se quiser):", 
+                              value=texto_para_ia, height=150)
 
 with col2:
-    perfil = st.selectbox("🎯 Público-alvo:", ["Desenvolvedores", "Gerentes de TI", "Diretores (C-Level)"])
+    perfil = st.selectbox("🎯 Público-alvo:", ["Desenvolvedores", "Gerentes de TI/Infra", "Diretores (C-Level)"])
 
-if st.button("🚀 Gerar Insight de Marketing"):
-    if not chave:
-        st.error("❌ Cole sua chave API na esquerda.")
-    elif not input_final:
-        st.warning("⚠️ Selecione uma notícia acima ou cole um texto.")
+if st.button("🚀 Criar Insight Estratégico"):
+    if not chave or not final_input:
+        st.error("Preencha a chave API e selecione uma notícia!")
     else:
         try:
             genai.configure(api_key=chave)
-            # Busca o modelo disponível
-            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            model = genai.GenerativeModel(available_models[0])
+            # Busca modelo automático
+            models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            model = genai.GenerativeModel(models[0])
             
-            with st.spinner('Criando estratégia...'):
-                prompt = f"Como especialista em marketing tech, analise este tema para {perfil}. Dê o sentimento, uma oportunidade de negócio e um post para LinkedIn: {input_final}"
-                response = model.generate_content(prompt)
-                st.success("✅ Estratégia pronta!")
-                st.markdown(response.text)
-        except Exception as e:
-            st.error(f"Erro: {e}")
+            with st.spinner('
