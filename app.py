@@ -3,17 +3,35 @@ import google.generativeai as genai
 import feedparser
 import re
 
-# --- CONFIGURAÇÕES INICIAIS ---
+# --- CONFIGURAÇÕES DE PÁGINA ---
 st.set_page_config(page_title="TechPulse Agency Pro", page_icon="⚡", layout="wide")
 
-# --- CSS DESIGN PREMIUM ---
+# --- CSS PARA CORRIGIR OS BUGS DE INTERFACE ---
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    .stButton>button { width: 100%; border-radius: 8px; background-color: #00c853; color: white; font-weight: bold; border: none; }
-    .content-card { background-color: #1a1c24; padding: 20px; border-radius: 12px; border: 1px solid #2d2f39; color: white; margin-bottom: 15px; }
-    .hook-card { background-color: #0a0c10; padding: 15px; border-radius: 8px; border-left: 4px solid #00c853; margin-bottom: 10px; }
-    .status-online { color: #00c853; font-weight: bold; font-size: 0.8em; }
+    /* Trava o container para não sumir no hover */
+    .stSelectbox, .stButton, .stTextArea { margin-bottom: 10px; }
+    
+    /* Ajusta a largura dos seletores para a seta não ficar longe */
+    [data-testid="stSelectbox"] { max-width: 100%; }
+    
+    /* Estilo dos Cards */
+    .content-card {
+        background-color: #1a1c24;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid #2d2f39;
+        color: white;
+        min-height: 100px;
+    }
+    
+    /* Botões Verdes */
+    .stButton>button {
+        background-color: #00c853 !important;
+        color: white !important;
+        font-weight: bold !important;
+        border: none !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -46,67 +64,62 @@ with st.sidebar:
         feed = feedparser.parse(fontes_rss[fonte_focada])
         if feed.entries:
             st.session_state['noticias_focadas'] = feed.entries[:10]
+            st.session_state.pop('base_traduzida', None) # Limpa tradução anterior
             st.success("Radar Atualizado!")
 
-# --- DASHBOARD ---
+# --- CONTEÚDO PRINCIPAL ---
 st.title("⚡ TechPulse Agency Pro")
-st.markdown("<p class='status-online'>● IA ESTRATEGISTA ATIVA</p>", unsafe_allow_html=True)
 
 if 'noticias_focadas' in st.session_state:
-    titulos = [n.title for n in st.session_state['noticias_focadas']]
-    escolha = st.selectbox("🎯 Selecione a Pauta do Dia:", titulos)
-    
+    # Seleção de pauta mais compacta
+    escolha = st.selectbox("🎯 Selecione a Pauta:", [n.title for n in st.session_state['noticias_focadas']])
+    noticia_alvo = next(n for n in st.session_state['noticias_focadas'] if n.title == escolha)
+
     col_a, col_b = st.columns([1, 1])
     
     with col_a:
-        noticia_alvo = next(n for n in st.session_state['noticias_focadas'] if n.title == escolha)
-        if st.button("🌍 Traduzir e Analisar Contexto"):
-            model = get_model(chave)
-            if model:
-                txt = limpar_html(noticia_alvo.get('summary', noticia_alvo.get('description', '')))
-                res = model.generate_content(f"Traduza para Marketing Tech BR: {noticia_alvo.title}. Resumo: {txt}")
-                st.session_state['base_traduzida'] = res.text
+        st.subheader("📰 Conteúdo Base")
+        if st.button("🌍 Traduzir Agora"):
+            if not chave: st.error("Insira a chave na barra lateral.")
+            else:
+                model = get_model(chave)
+                if model:
+                    txt = limpar_html(noticia_alvo.get('summary', noticia_alvo.get('description', '')))
+                    with st.spinner("Traduzindo..."):
+                        res = model.generate_content(f"Traduza para Marketing Tech BR: {noticia_alvo.title}. Resumo: {txt}")
+                        st.session_state['base_traduzida'] = res.text
 
-        base_texto = st.session_state.get('base_traduzida', noticia_alvo.title)
-        st.markdown(f"<div class='content-card'><small>CONTEÚDO BASE:</small><br>{base_texto}</div>", unsafe_allow_html=True)
+        # Exibe o texto (estável na tela)
+        base_texto = st.session_state.get('base_traduzida', f"Título: {noticia_alvo.title}")
+        st.markdown(f"<div class='content-card'>{base_texto}</div>", unsafe_allow_html=True)
 
     with col_b:
-        st.markdown("<div class='content-card'>", unsafe_allow_html=True)
-        perfil = st.selectbox("👥 Público-alvo:", ["Diretores/C-Level", "Gerentes de TI", "Especialistas"])
+        st.subheader("🎨 Configuração da Campanha")
+        perfil = st.selectbox("👥 Público:", ["Diretores/C-Level", "Gerentes de TI", "Especialistas"])
         slides = st.number_input("🔢 Slides Carrossel:", 1, 10, 5)
-        st.write("Canais Ativos:")
+        
+        st.write("Canais:")
         c1, c2, c3 = st.columns(3)
         q_st = c1.checkbox("Stories")
         q_fd = c2.checkbox("Feed")
         q_li = c3.checkbox("LinkedIn")
-        st.markdown("</div>", unsafe_allow_html=True)
         
         if st.button("🚀 GERAR CAMPANHA 360º"):
-            model = get_model(chave)
-            if model:
-                prompt = f"""
-                Aja como Diretor de Criação Tech. Base: {base_texto}. Público: {perfil}.
-                
-                1. 📝 CONTEÚDO: Gere {'Stories (curto),' if q_st else ''} {'Feed Meta,' if q_fd else ''} {'LinkedIn (Carrossel '+str(slides)+' slides)' if q_li else ''}.
-                2. 🔥 LABORATÓRIO DE GANHOS (Hooks): Crie 3 opções de títulos matadores (Foco em Medo, Foco em Lucro, Foco em Curiosidade).
-                3. 🎨 PROMPT VISUAL: Crie um comando detalhado em inglês para gerador de imagens IA (DALL-E/Midjourney) que represente esta notícia de forma futurista.
-                4. 📅 AGENDAMENTO: Sugira o melhor dia e horário para postar e uma 'Legenda de Comentário' para gerar debate.
-                """
-                with st.spinner("IA Orquestrando Campanha..."):
-                    response = model.generate_content(prompt)
-                    st.session_state['full_campaign'] = response.text
+            if not chave: st.error("Chave API faltando!")
+            else:
+                model = get_model(chave)
+                if model:
+                    prompt = f"""
+                    Aja como Diretor de Criação Tech. Base: {base_texto}. Público: {perfil}.
+                    Gere conteúdo para: {'Stories,' if q_st else ''} {'Feed,' if q_fd else ''} {'LinkedIn ('+str(slides)+' slides).' if q_li else ''}
+                    Crie também 3 Hooks (Ganhos), um Prompt Visual em inglês e sugestão de agendamento.
+                    """
+                    with st.spinner("Orquestrando campanha..."):
+                        response = model.generate_content(prompt)
+                        st.session_state['full_campaign'] = response.text
 
-# --- RESULTADOS EM ABAS ---
+# --- RESULTADOS ---
 if 'full_campaign' in st.session_state:
     st.markdown("---")
-    tab1, tab2, tab3 = st.tabs(["📄 Roteiros de Post", "🔥 Ganhos & Agendamento", "🎨 Identidade Visual"])
-    
-    with tab1:
-        st.markdown(f"<div class='content-card'>{st.session_state['full_campaign']}</div>", unsafe_allow_html=True)
-    
-    with tab2:
-        st.info("Dica: Use o 'Gancho de Medo' se a notícia for sobre vazamento de dados.")
-        st.write("Consulte os detalhes no roteiro acima para os horários sugeridos.")
-        
-    with tab3:
-        st.warning("Copie o Prompt Visual e cole no seu gerador de imagens favorito (Midjourney/Canva AI).")
+    st.subheader("✨ Campanha Pronta")
+    st.markdown(f"<div class='content-card'>{st.session_state['full_campaign']}</div>", unsafe_allow_html=True)
