@@ -7,47 +7,55 @@ import requests
 # --- 1. CONFIGURAÇÃO DE PÁGINA ---
 st.set_page_config(page_title="Tech Intelligence Hub PRO", page_icon="🛡️", layout="wide")
 
-# --- 2. CSS ULTRA BLACK REFORÇADO ---
+# --- 2. CSS ULTRA BLACK REFORÇADO (O "FIX" DOS TEXTOS BRANCOS) ---
 st.markdown("""
     <style>
+    /* Fundo Geral */
     [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stSidebar"], .main {
         background-color: #000000 !important;
         color: #ffffff !important;
     }
     
-    /* Forçar fundo de caixas e textos */
-    .st-emotion-cache-12w0qpk, .st-emotion-cache-6qob1r, div[data-testid="stText"] {
-        background-color: #000000 !important;
-    }
-
-    /* ESTILO DO BOTÃO - CORRIGINDO A COR DO TEXTO */
+    /* FIX DOS BOTÕES: Texto Preto Absoluto para leitura total */
     .stButton>button {
         width: 100%; border-radius: 12px !important; height: 4em !important;
         background: linear-gradient(90deg, #bc13fe, #00e5ff) !important;
-        color: #000000 !important; /* Texto em preto para contraste total */
+        color: #000000 !important; /* TEXTO PRETO */
         font-weight: 900 !important; 
         border: none !important;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 1.5px;
     }
-    
-    .stButton>button:hover {
-        box-shadow: 0 0 25px rgba(0, 229, 255, 0.6) !important;
-        transform: scale(1.01);
+    .stButton>button div p { color: #000000 !important; font-weight: 900 !important; }
+
+    /* FIX DOS TOOLTIPS (O '?' que abria branco) */
+    div[data-testid="stTooltipContent"] {
+        background-color: #0a0a0a !important;
+        color: #ffffff !important;
+        border: 2px solid #00e5ff !important;
+        padding: 15px !important;
+        border-radius: 10px !important;
     }
+    div[data-testid="stTooltipContent"] p { color: #ffffff !important; font-size: 14px !important; }
 
     /* Estilo das Caixas de Resultado */
     .result-box { 
-        background-color: #0a0a0a !important; 
+        background-color: #0f0f0f !important; 
         color: #ffffff !important;
         padding: 20px; border-radius: 12px; 
-        border: 1px solid #00e5ff !important; 
+        border: 1px solid rgba(0, 229, 255, 0.4) !important; 
         line-height: 1.6;
     }
 
+    /* Ajustes de Cores Gerais */
     h1, h2, h3, span, label, p { color: #ffffff !important; }
     .neon-green { color: #00ffa3 !important; text-shadow: 0 0 10px #00ffa3; }
     .step-label { color: #00e5ff !important; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; font-size: 0.8em; }
+    
+    /* Esconder o rastro branco das abas */
+    .stTabs [data-baseweb="tab-list"] { background-color: transparent !important; }
+    .stTabs [data-baseweb="tab"] { color: #888 !important; }
+    .stTabs [aria-selected="true"] { color: #00e5ff !important; border-bottom: 2px solid #00e5ff !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -68,13 +76,14 @@ def buscar_feed(url):
         return feedparser.parse(r.text)
     except: return None
 
-# --- 4. SIDEBAR ---
+# --- 4. BARRA LATERAL ---
 with st.sidebar:
     st.markdown("## 🛡️ Radar")
     fontes = {
         "CISO Advisor (BR)": "https://www.cisoadvisor.com.br/feed/",
         "The Hacker News (EN)": "https://feeds.feedburner.com/TheHackersNews",
-        "Convergência Digital (BR)": "https://www.convergenciadigital.com.br/rss/rss.xml"
+        "Data Center Dynamics (BR)": "https://www.datacenterdynamics.com/br/feed/",
+        "Convergência Digital (BR)": "https://www.convergenciadilital.com.br/rss/rss.xml"
     }
     canal = st.selectbox("Fonte:", list(fontes.keys()))
     if st.button("🔄 SINCRONIZAR"):
@@ -94,8 +103,8 @@ if 'news' in st.session_state:
     with col1:
         st.markdown("<p class='step-label'>Step 01</p>", unsafe_allow_html=True)
         st.markdown("### 🔍 Inteligência")
-        # Botão com help (o '?' automático)
-        if st.button("ANALISAR IMPACTO", help="Cria tradução técnica, impacto comercial e cenário de crise."):
+        # ANALISAR IMPACTO com Tooltip Black
+        if st.button("ANALISAR IMPACTO", help="Gera tradução técnica, impacto B2B e um cenário de crise realista para usar com o cliente."):
             model = get_gemini_model()
             if model:
                 resumo = re.sub('<.*?>', '', pauta.get('summary', pauta.get('description', '')))
@@ -109,8 +118,7 @@ if 'news' in st.session_state:
     with col2:
         st.markdown("<p class='step-label'>Step 02</p>", unsafe_allow_html=True)
         st.markdown("### 🎨 Produção")
-        # Variáveis definidas corretamente dentro da coluna
-        persona_selecionada = st.selectbox("Público:", ["Gerentes de TI", "Diretores/CTO", "Especialistas"])
+        persona_alvo = st.selectbox("Público:", ["Gerentes de TI", "Diretores/CTO", "Especialistas"])
         qtd_img = st.slider("Imagens desejadas:", 1, 5, 3)
         
         c_li = st.checkbox("LinkedIn", value=True)
@@ -122,7 +130,7 @@ if 'news' in st.session_state:
             if model and 'intel' in st.session_state:
                 canais = f"{'LinkedIn, ' if c_li else ''}{'Feed, ' if c_fd else ''}{'Stories' if c_st else ''}"
                 with st.spinner("Criando estratégia..."):
-                    prompt_mkt = f"Baseado em: {st.session_state['intel']}. Crie posts para {canais} focado em {persona_selecionada}. Gere Artigo e {qtd_img} prompts Midjourney com resoluções 1080x1440 (Feed) e 1080x1920 (Stories)."
+                    prompt_mkt = f"Baseado em: {st.session_state['intel']}. Crie posts para {canais} focado em {persona_alvo}. Gere Artigo e {qtd_img} prompts Midjourney com resoluções 1080x1440 (Feed) e 1080x1920 (Stories)."
                     st.session_state['mkt'] = model.generate_content(prompt_mkt).text
 
     with col3:
@@ -132,18 +140,18 @@ if 'news' in st.session_state:
             t1, t2, t3 = st.tabs(["📄 Posts", "📝 Artigo", "🎨 Visual"])
             
             with t1:
-                st.info("💡 Posts curtos para LinkedIn e Meta.")
+                st.info("💡 Posts otimizados para engajamento rápido.")
                 st.markdown(f"<div class='result-box'>{st.session_state['mkt'].split('Artigo:')[0]}</div>", unsafe_allow_html=True)
             
             with t2:
-                st.info("💡 Artigo de autoridade sênior.")
+                st.info("💡 Artigo focado em autoridade sênior.")
                 try:
                     art = st.session_state['mkt'].split('Artigo:')[1].split('Prompt')[0]
                     st.markdown(f"<div class='result-box'>{art}</div>", unsafe_allow_html=True)
                 except: st.write("Gere novamente para extrair o artigo.")
             
             with t3:
-                st.info("💡 Prompts para IA generativa de imagem.")
+                st.info("💡 Prompts com resoluções de Feed e Stories.")
                 try:
                     prompts = st.session_state['mkt'].split("Prompt")[-1]
                     st.markdown(f"<div class='result-box'>Prompt {prompts}</div>", unsafe_allow_html=True)
