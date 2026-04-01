@@ -7,46 +7,44 @@ import requests
 # --- 1. CONFIGURAÇÃO DE PÁGINA ---
 st.set_page_config(page_title="Tech Intelligence Hub PRO", page_icon="🛡️", layout="wide")
 
-# --- 2. CSS ULTRA BLACK REFORÇADO (CONTRA QUADROS BRANCOS) ---
+# --- 2. CSS ULTRA BLACK REFORÇADO ---
 st.markdown("""
     <style>
-    /* Fundo Geral */
     [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stSidebar"], .main {
         background-color: #000000 !important;
         color: #ffffff !important;
     }
     
-    /* Forçar fundos de widgets e caixas de texto */
-    .st-emotion-cache-12w0qpk, .st-emotion-cache-6qob1r, .stMarkdown, div[data-testid="stText"] {
+    /* Forçar fundo de caixas e textos */
+    .st-emotion-cache-12w0qpk, .st-emotion-cache-6qob1r, div[data-testid="stText"] {
         background-color: #000000 !important;
+    }
+
+    /* ESTILO DO BOTÃO - CORRIGINDO A COR DO TEXTO */
+    .stButton>button {
+        width: 100%; border-radius: 12px !important; height: 4em !important;
+        background: linear-gradient(90deg, #bc13fe, #00e5ff) !important;
+        color: #000000 !important; /* Texto em preto para contraste total */
+        font-weight: 900 !important; 
+        border: none !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .stButton>button:hover {
+        box-shadow: 0 0 25px rgba(0, 229, 255, 0.6) !important;
+        transform: scale(1.01);
     }
 
     /* Estilo das Caixas de Resultado */
     .result-box { 
         background-color: #0a0a0a !important; 
         color: #ffffff !important;
-        padding: 20px; 
-        border-radius: 12px; 
+        padding: 20px; border-radius: 12px; 
         border: 1px solid #00e5ff !important; 
         line-height: 1.6;
-        margin-bottom: 15px;
     }
 
-    /* Corrigir Tooltips e Popovers (o fundo do '?' que estava branco) */
-    div[data-testid="stTooltipContent"] {
-        background-color: #111111 !important;
-        color: #ffffff !important;
-        border: 1px solid #bc13fe !important;
-    }
-
-    /* Botão Customizado */
-    .stButton>button {
-        width: 100%; border-radius: 12px !important; height: 4em !important;
-        background: linear-gradient(90deg, #bc13fe, #00e5ff) !important;
-        color: white !important; font-weight: 800 !important; border: none !important;
-    }
-    
-    /* Títulos e Labels */
     h1, h2, h3, span, label, p { color: #ffffff !important; }
     .neon-green { color: #00ffa3 !important; text-shadow: 0 0 10px #00ffa3; }
     .step-label { color: #00e5ff !important; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; font-size: 0.8em; }
@@ -96,12 +94,12 @@ if 'news' in st.session_state:
     with col1:
         st.markdown("<p class='step-label'>Step 01</p>", unsafe_allow_html=True)
         st.markdown("### 🔍 Inteligência")
-        # O 'help' cria o ponto de interrogação automático com o texto de ajuda
-        if st.button("ANALISAR IMPACTO", help="Gera tradução técnica, impacto B2B e um cenário de crise para convencer o cliente."):
+        # Botão com help (o '?' automático)
+        if st.button("ANALISAR IMPACTO", help="Cria tradução técnica, impacto comercial e cenário de crise."):
             model = get_gemini_model()
             if model:
                 resumo = re.sub('<.*?>', '', pauta.get('summary', pauta.get('description', '')))
-                with st.spinner("Analisando..."):
+                with st.spinner("Decodificando..."):
                     resp = model.generate_content(f"Analise: {pauta.title}. Contexto: {resumo}. Gere Flash Report e Cenário de Crise.")
                     st.session_state['intel'] = resp.text
         
@@ -111,4 +109,43 @@ if 'news' in st.session_state:
     with col2:
         st.markdown("<p class='step-label'>Step 02</p>", unsafe_allow_html=True)
         st.markdown("### 🎨 Produção")
-        persona
+        # Variáveis definidas corretamente dentro da coluna
+        persona_selecionada = st.selectbox("Público:", ["Gerentes de TI", "Diretores/CTO", "Especialistas"])
+        qtd_img = st.slider("Imagens desejadas:", 1, 5, 3)
+        
+        c_li = st.checkbox("LinkedIn", value=True)
+        c_fd = st.checkbox("Feed (1080x1440)")
+        c_st = st.checkbox("Stories (1080x1920)")
+
+        if st.button("GERAR CONTEÚDO"):
+            model = get_gemini_model()
+            if model and 'intel' in st.session_state:
+                canais = f"{'LinkedIn, ' if c_li else ''}{'Feed, ' if c_fd else ''}{'Stories' if c_st else ''}"
+                with st.spinner("Criando estratégia..."):
+                    prompt_mkt = f"Baseado em: {st.session_state['intel']}. Crie posts para {canais} focado em {persona_selecionada}. Gere Artigo e {qtd_img} prompts Midjourney com resoluções 1080x1440 (Feed) e 1080x1920 (Stories)."
+                    st.session_state['mkt'] = model.generate_content(prompt_mkt).text
+
+    with col3:
+        st.markdown("<p class='step-label'>Step 03</p>", unsafe_allow_html=True)
+        st.markdown("### ✨ Resultados")
+        if 'mkt' in st.session_state:
+            t1, t2, t3 = st.tabs(["📄 Posts", "📝 Artigo", "🎨 Visual"])
+            
+            with t1:
+                st.info("💡 Posts curtos para LinkedIn e Meta.")
+                st.markdown(f"<div class='result-box'>{st.session_state['mkt'].split('Artigo:')[0]}</div>", unsafe_allow_html=True)
+            
+            with t2:
+                st.info("💡 Artigo de autoridade sênior.")
+                try:
+                    art = st.session_state['mkt'].split('Artigo:')[1].split('Prompt')[0]
+                    st.markdown(f"<div class='result-box'>{art}</div>", unsafe_allow_html=True)
+                except: st.write("Gere novamente para extrair o artigo.")
+            
+            with t3:
+                st.info("💡 Prompts para IA generativa de imagem.")
+                try:
+                    prompts = st.session_state['mkt'].split("Prompt")[-1]
+                    st.markdown(f"<div class='result-box'>Prompt {prompts}</div>", unsafe_allow_html=True)
+                    st.link_button("🚀 IR PARA MIDJOURNEY", "https://www.midjourney.com/imagine")
+                except: st.write("Prompts não encontrados.")
