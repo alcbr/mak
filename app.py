@@ -7,7 +7,7 @@ import requests
 # --- 1. CONFIGURAÇÃO DE PÁGINA ---
 st.set_page_config(page_title="Tech Intelligence Hub PRO", page_icon="🛡️", layout="wide")
 
-# --- 2. CSS ULTRA BLACK REFORÇADO (O FIM DOS ERROS VISUAIS) ---
+# --- 2. CSS ULTRA BLACK & NEON GREEN FIX ---
 st.markdown("""
     <style>
     /* Fundo Geral */
@@ -16,7 +16,7 @@ st.markdown("""
         color: #ffffff !important;
     }
     
-    /* BOTÃO: Texto Preto Absoluto e Legível */
+    /* BOTÃO: Texto Preto Absoluto */
     .stButton>button {
         width: 100%; border-radius: 12px !important; height: 4em !important;
         background: linear-gradient(90deg, #bc13fe, #00e5ff) !important;
@@ -25,20 +25,22 @@ st.markdown("""
         border: none !important;
         text-transform: uppercase;
     }
-    .stButton>button div p { color: #000000 !important; font-weight: 900 !important; font-size: 16px !important; }
+    .stButton>button div p { color: #000000 !important; font-weight: 900 !important; }
 
-    /* FIX DEFINITIVO DO HELP (TOOLTIP) */
-    div[data-testid="stTooltipContent"] {
-        background-color: #000000 !important;
-        border: 2px solid #00e5ff !important;
+    /* HELP BOX VERDE NEON (Substituindo o Tooltip bugado) */
+    .stExpander {
+        border: 1px solid #00ffa3 !important;
+        background-color: #050505 !important;
         border-radius: 10px !important;
-        box-shadow: 0 0 20px rgba(0, 229, 255, 0.5) !important;
-        min-width: 280px !important;
     }
-    div[data-testid="stTooltipContent"] p {
-        color: #ffffff !important;
-        font-size: 15px !important;
-        font-weight: 500 !important;
+    .stExpander summary span {
+        color: #00ffa3 !important;
+        font-weight: bold !important;
+    }
+    .help-text {
+        color: #00ffa3 !important;
+        font-size: 14px !important;
+        padding: 10px;
     }
 
     /* Estilo das Caixas de Resultado */
@@ -47,17 +49,11 @@ st.markdown("""
         color: #ffffff !important;
         padding: 20px; border-radius: 12px; 
         border: 1px solid rgba(0, 229, 255, 0.4) !important; 
-        line-height: 1.6;
     }
 
     h1, h2, h3, span, label, p { color: #ffffff !important; }
     .neon-green { color: #00ffa3 !important; text-shadow: 0 0 10px #00ffa3; }
     .step-label { color: #00e5ff !important; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; font-size: 0.8em; }
-    
-    /* Remover quadros brancos das abas */
-    .stTabs [data-baseweb="tab-list"] { background-color: transparent !important; }
-    .stTabs [data-baseweb="tab"] { color: #777 !important; }
-    .stTabs [aria-selected="true"] { color: #00e5ff !important; border-bottom: 2px solid #00e5ff !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -103,8 +99,11 @@ if 'news' in st.session_state:
 
     with col1:
         st.markdown("<p class='step-label'>Step 01</p>", unsafe_allow_html=True)
-        # O HELP agora está no título para não sobrepor o botão
-        st.markdown("### 🔍 Inteligência", help="Este módulo gera tradução técnica, impacto comercial B2B e um cenário de crise realista para usar com o cliente.")
+        st.markdown("### 🔍 Inteligência")
+        
+        # AJUDA VERDE FIXA
+        with st.expander("❓ O que esta opção faz?"):
+            st.markdown("<p class='help-text'>Traduz a notícia técnica, gera um relatório B2B e cria um cenário de crise para prospecção.</p>", unsafe_allow_html=True)
         
         if st.button("ANALISAR IMPACTO"):
             model = get_gemini_model()
@@ -119,7 +118,10 @@ if 'news' in st.session_state:
 
     with col2:
         st.markdown("<p class='step-label'>Step 02</p>", unsafe_allow_html=True)
-        st.markdown("### 🎨 Produção", help="Gera posts para redes, artigo de autoridade e prompts Midjourney.")
+        st.markdown("### 🎨 Produção")
+        
+        with st.expander("❓ O que esta opção faz?"):
+            st.markdown("<p class='help-text'>Gera posts para redes, artigo de autoridade e prompts Midjourney específicos.</p>", unsafe_allow_html=True)
         
         persona_final = st.selectbox("Público:", ["Gerentes de TI", "Diretores/CTO", "Especialistas"])
         qtd_img = st.slider("Imagens desejadas:", 1, 5, 3)
@@ -133,7 +135,7 @@ if 'news' in st.session_state:
             if model and 'intel' in st.session_state:
                 canais = f"{'LinkedIn, ' if c_li else ''}{'Feed, ' if c_fd else ''}{'Stories' if c_st else ''}"
                 with st.spinner("Criando estratégia..."):
-                    prompt_mkt = f"Baseado em: {st.session_state['intel']}. Crie posts para {canais} focado em {persona_final}. Gere Artigo e {qtd_img} prompts Midjourney diferentes com resoluções 1080x1440 (Feed) e 1080x1920 (Stories)."
+                    prompt_mkt = f"Baseado em: {st.session_state['intel']}. Crie posts para {canais} focado em {persona_final}. Gere Artigo e {qtd_img} prompts Midjourney com resoluções 1080x1440 (Feed) e 1080x1920 (Stories)."
                     st.session_state['mkt'] = model.generate_content(prompt_mkt).text
 
     with col3:
